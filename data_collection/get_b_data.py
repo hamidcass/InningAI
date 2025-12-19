@@ -14,6 +14,7 @@ def fetch_data(min_year, max_year, min_pa=200):
             year_data = batting_stats(year, qual=min_pa)
             year_data['Season'] = year #add year
             data.append(year_data)
+
             print(f"  ✓ Found {len(year_data)} players")
         except Exception as e:
             print(f"  ✗ Error fetching {year}: {e}")

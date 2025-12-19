@@ -1,8 +1,59 @@
 import pandas as pd
 
+
 #we need to prep the data so that the model can notice patterns to train off
 
+#team to long name
+team_name_id = {
+    #AL EAST
+    "NYY": 147,
+    "TOR": 141,
+    "BAL": 110,
+    "TBR": 139,
+    "BOS": 111,
 
+    #AL CENTRAL
+    "DET": 116,
+    "CHW": 145,
+    "KCR": 118,
+    "MIN": 142, 
+    "CLE": 114,
+
+
+    #AL WEST
+    "HOU": 117,
+    "SEA": 136,
+    "LAA": 108,
+    "OAK": 133,
+    "TEX": 140,
+
+    #NL EAST
+    "NYM": 121,
+    "MIA": 146,
+    "WSN": 120,
+    "PHI": 143,
+    "ATL": 144,
+
+    #NL CENTRAL
+    "CIN": 113,
+    "PIT": 134,
+    "CHC": 112,
+    "MIL": 158,
+    "STL": 138,
+
+    #NL WEST
+    "LAD": 119,
+    "SDP": 135,
+    "COL": 115,
+    "ARI": 109,
+    "SFG": 137,
+
+}
+
+# def get_park_factor(team):
+#     team_id = team_name_id(team)
+
+#     #get list of park factors for team home stadium
 
 def get_input_metrics(stat):
     if stat == "HR":

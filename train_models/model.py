@@ -4,6 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 #ML models
+from sklearn.compose import ColumnTransformer 
+from sklearn.preprocessing import OneHotEncoder 
+from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
@@ -32,6 +35,7 @@ def get_stats(stat):
     if stat == "HR":
         return [
             'Age',           # Players peak ~27-30, then decline
+            'Team',
             'PA',            # Playing time (more PAs = more HR opportunities)
             'HR',            # Last year's HR (best predictor!)
             'ISO',           # Isolated power (SLG - AVG)
@@ -45,6 +49,7 @@ def get_stats(stat):
     elif stat == "AVG":
         return [
             'Age',           # Context
+            'Team',
             'PA',            # Playing time
             'AVG',           # Last year's AVG (best predictor!)
             'K%',            # Strikeout rate (fewer K = higher AVG)
@@ -58,6 +63,7 @@ def get_stats(stat):
     elif stat == "OPS":
         return [
                 'Age',           # Context
+                'Team',
                 'PA',            # Playing time
                 'OPS',           # Last year's OPS (best predictor!)
                 'wRC+',          # Weighted runs created (overall value)
@@ -72,6 +78,7 @@ def get_stats(stat):
     elif stat == "wRC+":
         return [
             'Age',           # Context
+            'Team',
             'PA',            # Playing time
             'wRC+',          # Last year's wRC+ (best predictor!)
             'wOBA',          # Foundation of wRC+
@@ -317,7 +324,16 @@ target_data, training_data = get_target_data(training_data)
 target_stat = "OPS"
 #separate into input and output
 stats = get_stats(target_stat)
+categorial_features = ["Current_Team", "Next_Team"]
 print(stats)
+
+#ColumnTransformer
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', 'passthrough', stats)
+        ('cat', OneHotEncoder(handle_unknown='ignore'), categorial_features)
+    ]
+)
 
 x_train, y_train = get_features(training_data, stats, target_stat)
 x_test, y_test = get_features(target_data, stats, target_stat)
