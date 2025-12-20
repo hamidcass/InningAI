@@ -96,7 +96,7 @@ def get_input_metrics(stat):
                 'Barrel%',       # Elite contact
                 'xwOBA',         # Expected wOBA (similar to OPS)
         ]
-    elif stat == "wRC":
+    elif stat == "wRC+":
         return [
             'Age',           # Context
             'PA',            # Playing time
@@ -114,7 +114,7 @@ def get_input_metrics(stat):
         return None
 
 
-def prep_data_hr(dataset, inputs):
+def prep_data(dataset, inputs):
     #current year (input metrics) -> following year (output metric)
     
     #step 1: sort by player name and season so we can locate the next year quickly
@@ -195,7 +195,7 @@ def run(stat):
     input_data = get_input_metrics(target_stat)
 
     if input_data:
-        ml_dataset = prep_data_hr(data, input_data)
+        ml_dataset = prep_data(data, input_data)
         print(f"ML Dataset shape: {ml_dataset.shape}")
         print(f"Number of player-season pairs: {len(ml_dataset)}")
 
@@ -207,5 +207,5 @@ def run(stat):
         print("\nSample ML data:")
         print(ml_dataset.head())
 
-    return ""
+    return ml_dataset
         
