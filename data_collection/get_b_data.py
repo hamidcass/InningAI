@@ -15,12 +15,15 @@ def fetch_data(min_year, max_year, min_pa=200):
             year_data['Season'] = year #add year
             data.append(year_data)
 
+            
+
             print(f"  ✓ Found {len(year_data)} players")
         except Exception as e:
             print(f"  ✗ Error fetching {year}: {e}")
 
         ##make one big dataframe from all rows
     all_years_data = pd.concat(data, ignore_index=True)
+    all_years_data['Team'] = all_years_data['Team'].replace("- - -", "MULTI")
     return all_years_data
 
 

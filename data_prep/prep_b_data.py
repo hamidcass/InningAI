@@ -137,6 +137,14 @@ def prep_data_hr(dataset, inputs):
 
                 #only include if seasons were back-to-back
                 if following_season["Season"] == curr_season["Season"] + 1: 
+
+
+                    # Handle MULTI-team seasons
+                    if curr_season["Team"] == "MULTI":
+                       
+                       pass
+
+
                     row = {
                         "Name": player,
                         "Current_Season": curr_season["Season"],
@@ -154,9 +162,9 @@ def prep_data_hr(dataset, inputs):
     new_df = pd.DataFrame(machine_learning_dataset)
     return new_df
 
+print("PREP RUNNING")
 
 
-    pass
 
 # data = pd.read_csv("../data_collection/batting.csv")
 
