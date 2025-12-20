@@ -7,6 +7,8 @@ import plotly.graph_objects as go
 from data_prep import prep_b_data
 from train_models import pipeline 
 
+
+
 st.set_page_config(page_title="MLB Performance Projections", layout="wide", page_icon="⚾")
 
 # Title
@@ -60,11 +62,13 @@ if run_button or 'results' in st.session_state:
         
         #now that we have the df with correct features, send to pipeline
         mae, r2, num_players, results_df = pipeline.run(df, target_stat, model_choice, year_range)
-
+        
         st.session_state.results = {
+            "year_range": year_range,
             'mae': mae,
             'r2': r2,
-            'num_players': num_players
+            'num_players': num_players,
+            "results_df": results_df,
         }
     
     # Metrics row
@@ -96,14 +100,15 @@ if run_button or 'results' in st.session_state:
         #use plot data for visualizations
         
         fig = px.scatter(
-            results_df, 
+            st.session_state.results['results_df'], 
             x='Actual', 
             y='Predicted',
             hover_data={
                 'Player': True,
                 f'{year_range[1]+1} Team': True,
                 'Actual': ':.3f',
-                'Predicted': ':.3f'
+                'Predicted': ':.3f',
+                "Error": ":.3f"
     },
             title=f"Projected vs Actual {target_stat}",
             labels={'Actual': f'Actual {target_stat}', 'Projected': f'Projected {target_stat}'}
@@ -142,17 +147,21 @@ if run_button or 'results' in st.session_state:
             if value < 0: #underperformane
                 color = "red"
             elif value > 0:
-                color = "green"
+                color = "blue"
             else:
                 color = ""
             return f"background-color: {color}"
 
         col_a, col_b = st.columns(2)
         with col_a:
+
+            results_df = st.session_state.results['results_df']
+
             st.markdown("**🔥 Top 5 Overperformers**")
 
             overperformers = (
                 results_df[results_df['Error'] < 0]
+                .nsmallest(5, 'Error') #fixes sorting bug
                 .head(5)[['Player', 'Predicted', 'Actual', 'Error']]
                 .copy()
             )
@@ -178,10 +187,14 @@ if run_button or 'results' in st.session_state:
             st.dataframe(styled, hide_index=True)
 
         with col_b:
+
+            results_df = st.session_state.results['results_df']
+
             st.markdown("**📉 Top 5 Underperformers**")
 
             underperformers = (
                 results_df[results_df['Error'] > 0]
+                .nlargest(5, 'Error') #fixes sorting bug
                 .head(5)[['Player', 'Predicted', 'Actual', 'Error']]
                 .copy()
             )
@@ -206,27 +219,83 @@ if run_button or 'results' in st.session_state:
             st.dataframe(styled, hide_index=True)
             
     with tab2:
+
+        def get_prediction_grade(error, stat_type):
+            """Return letter grade for prediction quality"""
+            abs_error = abs(error)
+            
+            thresholds = {
+                "OPS": [(0.030, "A+"), (0.050, "A"), (0.070, "B"), (0.090, "C"), (0.120, "D")],
+                "HR": [(3, "A+"), (5, "A"), (8, "B"), (12, "C"), (15, "D")],
+                "AVG": [(0.020, "A+"), (0.035, "A"), (0.050, "B"), (0.070, "C"), (0.090, "D")],
+                "wRC+": [(8, "A+"), (15, "A"), (25, "B"), (35, "C"), (45, "D")]
+            }
+            
+            for threshold, grade in thresholds[stat_type]:
+                if abs_error < threshold:
+                    return grade
+            return "F"
+
+
+        results_df = st.session_state.results['results_df']
+
         st.subheader("Player Search")
         
-        player_search = st.text_input("🔍 Search for a player...", placeholder="e.g., Shohei Ohtani")
+        # Searchable dropdown (filters as you type)
+        player_list = ['Select a player...'] + sorted(results_df['Player'].unique().tolist())
+        selected_player = st.selectbox(
+            "🔍 Search or select a player",
+            player_list,
+            index=0
+        )
         
-        if player_search:
-            st.markdown(f"### Results for: {player_search}")
+        if selected_player and selected_player != 'Select a player...':
+
+            results_df = st.session_state.results['results_df']
+            year_range = st.session_state.results['year_range']
+
+            # Get player data
+            player_row = results_df[results_df['Player'] == selected_player].iloc[0]
+            print(player_row)
+            st.markdown(f"### Results for: {player_row['Player']}")
             
             # Player card
             card_col1, card_col2, card_col3 = st.columns([1, 1, 1])
             
             with card_col1:
-                st.metric("Predicted OPS", "0.875")
+                st.metric(f"Predicted {year_range[1]+1} {target_stat}", f"{player_row['Predicted']:.3f}")
             with card_col2:
-                st.metric("Actual OPS", "0.921", delta="+0.046")
+                st.metric(
+                    f"Actual {year_range[1]+1} {target_stat}", 
+                    f"{player_row['Actual']:.3f}", 
+                    delta=f"{-player_row['Error']:.3f}"
+                )
             with card_col3:
-                st.metric("Confidence", "85%")
+
+                #getter letter grade score for guess
+                score = get_prediction_grade(player_row["Error"], target_stat)
+                st.metric("Prediction Score", score)
+
+
+                # # Calculate confidence based on error
+                # confidence = max(0, 100 - abs(player_row['Pct_Error']))
+                # st.metric("Accuracy", f"{confidence:.0f}%")
             
-            # TODO: Add player-specific visualizations (radar chart, trend line, etc.)
-            st.info("Player detail visualizations coming soon...")
+            # Additional player info
+            st.markdown("---")
+
+            
+
+            info_col1, info_col2, info_col3 = st.columns(3)
+            with info_col1:
+                st.write(f"**Team:** {player_row[f'{year_range[1]} Team']} → {player_row[f'{year_range[1]+1} Team']}")
+            with info_col2:
+                st.write(f"**Age:** {player_row['Age']}")
+            with info_col3:
+                st.write(f"**PA:** {player_row['PA']}")
+                
         else:
-            st.info("👆 Enter a player name to see detailed predictions")
+            st.info("👆 Start typing or click to select a player")
     
     with tab3:
         st.subheader("Feature Importance Analysis")
