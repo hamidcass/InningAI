@@ -59,11 +59,14 @@ if run_button or 'results' in st.session_state:
 
         #send target stat to prep file to get new df of appropriate features
         df = prep_b_data.run(target_stat)
+
+
         
         #now that we have the df with correct features, send to pipeline
         mae, r2, num_players, results_df = pipeline.run(df, target_stat, model_choice, year_range)
         
         st.session_state.results = {
+            "training_data": df,
             "year_range": year_range,
             'mae': mae,
             'r2': r2,
@@ -126,9 +129,7 @@ if run_button or 'results' in st.session_state:
 
         # Add perfect prediction line
         fig.add_trace(go.Scatter(
-            #TODO: change scale based on stat
-            
-                
+             
             x=get_scale(),
             y=get_scale(),
             mode='lines',
@@ -171,13 +172,13 @@ if run_button or 'results' in st.session_state:
             )
             
             #limit to appropriate decimal place for stat
-            if target_stat in ['OPS', 'AVG', 'wRC+']:
+            if target_stat in ['OPS', 'AVG']:
                 styled = styled.format({
                     "Predicted": "{:.3f}",
                     "Actual": "{:.3f}",
                     "Error": "{:.3f}",
                 })
-            else:  # HR, counting stats
+            else:  # HR, wrc+ (whole numbers)
                 styled = styled.format({
                     "Predicted": "{:.0f}",
                     "Actual": "{:.0f}",
@@ -221,7 +222,7 @@ if run_button or 'results' in st.session_state:
     with tab2:
 
         def get_prediction_grade(error, stat_type):
-            """Return letter grade for prediction quality"""
+            #Return letter grade for prediction quality
             abs_error = abs(error)
             
             thresholds = {
@@ -257,18 +258,41 @@ if run_button or 'results' in st.session_state:
             # Get player data
             player_row = results_df[results_df['Player'] == selected_player].iloc[0]
             print(player_row)
-            st.markdown(f"### Results for: {player_row['Player']}")
+            st.markdown(f"### {player_row['Player']}")
             
             # Player card
+
+            #bio
+            st.markdown("#### Player Info")
+            info_col1, info_col2, info_col3 = st.columns(3)
+            with info_col1:
+                st.write(f"**Team:** {player_row[f'{year_range[1]} Team']} → {player_row[f'{year_range[1]+1} Team']}")
+            with info_col2:
+                st.write(f"**Age:** {player_row['Age']}")
+            with info_col3:
+                st.write(f"**PA:** {player_row['PA']}")
+            
+            st.markdown("---")
+
+            # Prediction metrics
+            st.markdown(f"#### Prediction Summary ({model_choice})")
             card_col1, card_col2, card_col3 = st.columns([1, 1, 1])
+
+            if target_stat in ['OPS', 'AVG']:
+                fmt = "{:.3f}"
+            else:  # HR, wRC+
+                fmt = "{:.0f}"
             
             with card_col1:
-                st.metric(f"Predicted {year_range[1]+1} {target_stat}", f"{player_row['Predicted']:.3f}")
+                st.metric(
+                    f"Predicted {year_range[1]+1} {target_stat}", 
+                    fmt.format(player_row["Predicted"])
+                )
             with card_col2:
                 st.metric(
                     f"Actual {year_range[1]+1} {target_stat}", 
-                    f"{player_row['Actual']:.3f}", 
-                    delta=f"{-player_row['Error']:.3f}"
+                    fmt.format(player_row["Actual"]), 
+                    delta=fmt.format(-player_row["Error"])
                 )
             with card_col3:
 
@@ -281,18 +305,83 @@ if run_button or 'results' in st.session_state:
                 # confidence = max(0, 100 - abs(player_row['Pct_Error']))
                 # st.metric("Accuracy", f"{confidence:.0f}%")
             
-            # Additional player info
-            st.markdown("---")
-
             
+            st.markdown("---")
+            st.markdown("#### Historical Performance")
 
-            info_col1, info_col2, info_col3 = st.columns(3)
-            with info_col1:
-                st.write(f"**Team:** {player_row[f'{year_range[1]} Team']} → {player_row[f'{year_range[1]+1} Team']}")
-            with info_col2:
-                st.write(f"**Age:** {player_row['Age']}")
-            with info_col3:
-                st.write(f"**PA:** {player_row['PA']}")
+            df = prep_b_data.run(target_stat)
+            player_history = df[df['Name'] == selected_player][['Current_Season', 'Current_Team', f"Current_{target_stat}"]].sort_values('Current_Season')
+            player_history = player_history[player_history['Current_Season'].between(year_range[0], year_range[1])]
+
+            # Add prediction to graph
+            prediction_row = pd.DataFrame({
+                'Current_Season': [year_range[1] + 1],
+                'Current_Team': [player_row[f'{year_range[1]+1} Team']],
+                f'Current_{target_stat}': [player_row['Predicted']]
+            })
+
+            # Combine historical data with prediction
+            player_history_full = pd.concat([player_history, prediction_row], ignore_index=True)
+
+            # Line graph showing historical performance + prediction
+            fig = px.line(
+                player_history_full, 
+                x='Current_Season', 
+                y=f'Current_{target_stat}',
+                markers=True,
+                labels={
+                    'Current_Season': 'Season',
+                    f'Current_{target_stat}': target_stat
+                }
+            )
+
+            # Customize appearance
+            fig.update_traces(
+                line=dict(color='#003087', width=3),
+                marker=dict(size=10, color='#13aa52'),
+                name='Historical'
+            )
+
+            # Get last historical year value for connecting lines
+            last_year = player_history.iloc[-1]['Current_Season']
+            last_value = player_history.iloc[-1][f'Current_{target_stat}']
+
+            # Add dashed line from 2024 to 2025 Actual
+            fig.add_trace(go.Scatter(
+                x=[last_year, year_range[1] + 1],
+                y=[last_value, player_row['Actual']],
+                mode='lines+markers',
+                line=dict(color='red', width=2, dash='dash'),
+                marker=dict(size=10, color='red'),
+                name='Actual',
+                hovertemplate='<b>Season:</b> %{x}<br>' +
+                            f'<b>{target_stat} (Actual):</b> %{{y:.3f}}<br>' +
+                            '<extra></extra>'
+            ))
+
+            # Highlight the 2025 prediction point with star
+            fig.add_trace(go.Scatter(
+                x=[year_range[1] + 1],
+                y=[player_row['Predicted']],
+                mode='markers',
+                marker=dict(size=10, color='orange', symbol='circle'),
+                name='Prediction',
+                hovertemplate=f'<b>Season:</b> {year_range[1] + 1}<br>' +
+                            f'<b>{target_stat} (Predicted):</b> {player_row["Predicted"]:.3f}<br>' +
+                            '<extra></extra>'
+            ))
+
+            # Add hover info for historical line
+            fig.update_traces(
+                hovertemplate='<b>Season:</b> %{x}<br>' +
+                            f'<b>{target_stat}:</b> %{{y:.3f}}<br>' +
+                            '<extra></extra>',
+                selector=dict(name='Historical')
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+                        
                 
         else:
             st.info("👆 Start typing or click to select a player")
@@ -325,6 +414,9 @@ if run_button or 'results' in st.session_state:
         """)
 
 else:
+
+    #len_df = st.session_state.results['length_player_seasons']
+
     # Initial state - show instruction
     #st.info("👆 Configure your prediction settings and click **Run Predictions** to start")
     st.info("Machine learning meets baseball. Predict 2025 player stats using 4 years of data, advanced metrics, and ensemble ML models." \
@@ -335,7 +427,7 @@ else:
     
     quick_col1, quick_col2, quick_col3, quick_col4 = st.columns(4)
     with quick_col1:
-        st.metric("Total Player-Seasons", "920")
+        st.metric("Total Player-Seasons", 1186) #hardcoded of num rows for prepared_data.csv
     with quick_col2:
         st.metric("Years Covered", "2020-2024")
     with quick_col3:
