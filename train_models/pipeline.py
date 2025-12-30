@@ -9,26 +9,41 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from scipy.stats import zscore
 from xgboost import XGBRegressor
+import shap
+
+
 
 #these will be the ml models that our pipeline interates through
 #we can add more to the list or tune our hyperparameters here
 models = {
     "Linear Regression": LinearRegression(),
-    "Ridge Regression": Ridge(alpha=0.1),
+    "Ridge Regression": Ridge(alpha=10.0),
     "Random Forest": RandomForestRegressor(
-        n_estimators=500,
-        max_depth=20,
+        n_estimators=300,
+        max_depth=10,
         random_state=42
     ),
     "XGBoost": XGBRegressor(
         n_estimators=500,
         learning_rate=0.05,
-        max_depth=8,
+        max_depth=6,
         subsample=0.8,
         colsample_bytree=0.8,
         random_state=42
     )
 }
+
+#holds park factors for last year in range (year that we are predicting next year from)
+park_factors_2024 = {
+    'ARI': 101, 'ATL': 100, 'BAL': 99, 'BOS': 107, 'CHC': 97,
+    'CHW': 99, 'CIN': 105, 'CLE': 97, 'COL': 112, 'DET': 98,
+    'HOU': 100, 'KC': 104, 'KCR': 104, 'LAA': 100, 'LAD': 100, 'MIA': 101,
+    'MIL': 97, 'MIN': 102, 'NYM': 97, 'NYY': 100, 'OAK': 97, 'ATH': 97,
+    'PHI': 101, 'PIT': 101, 'SD': 96, 'SDP': 96, 'SEA': 91, 'SF': 97, 'SFG':97,
+    'STL': 100, 'TB': 96, 'TBR': 96, 'TEX': 101, 'TOR': 100, 'WSH': 101, 'WSN': 101,
+    'MULTI': 100  # For players on multiple teams
+}
+
 
 #this will hold the the predictions and mean absolute error 
 #TODO: add other metrics to this dict
@@ -44,7 +59,7 @@ def get_stats(stat):
         return [
             'Age',           #can potentially show a common decline in production after a certain age
             'PA',            # Plate appearances (more PAs = more HR opportunities)
-            'HR',            # Last year's HR total
+            # 'HR',            # Last year's HR total
             'ISO',           # Isolated power (SLG - AVG)
             'FB%',           # Flyball rate (more potential for hr if player gets ball in air more often)
             'HR/FB',         # distinguish a hr from a pop fly
@@ -57,20 +72,20 @@ def get_stats(stat):
         return [
             'Age',           
             'PA',            
-            'AVG',           # Last year's AVG 
+            # 'AVG',           # Last year's AVG 
             'K%',            # Strikeout rate (less strikeouts = probably better hitter = higher avg)
             'Contact%',      # if more contact, less whiff and probably more base hits
             'BABIP',         # luck factor
             'LD%',           # Line drive rate (more line drives = probably more hits)
             'Hard%',        
             'Soft%',         # Soft contact = easier to get out
-            'xBA',           # Expected batting average (Statcast)
+            # 'xBA',           # Expected batting average (Statcast)
         ]
     elif stat == "OPS":
         return [
                 'Age',              
                 'PA',            
-                'OPS',           # Last year's OPS
+                # 'OPS',           # Last year's OPS
                 'wRC+',          # Weighted runs created (top tier offensive stat in general)
                 'BB%',           # Walk rate = higher obp = higher ops 
                 'K%',            # Strikeout rate = the more the worse
@@ -84,7 +99,7 @@ def get_stats(stat):
         return [
             'Age',           
             'PA',            
-            'wRC+',          # Last year's wRC+
+            # 'wRC+',          # Last year's wRC+
             'wOBA',          # Foundation of wRC+
             'BB%',           # Walks = good
             'K%',            # Strikeouts = bad
@@ -104,7 +119,7 @@ def get_features(training_data, stats, target_stat):
 
     x_cols = (
         [f"Current_{stat}" for stat in stats] +
-        ["Current_Team", "Next_Team"]
+        ["Current_Park_Factor", "Next_Park_Factor"]
     )
     x = training_data[x_cols]
 
@@ -116,7 +131,7 @@ def get_features(training_data, stats, target_stat):
 def get_target_data(training_data):
 
     target_data = training_data[training_data["Next_Season"] == 2025].copy()
-    training_data = training_data[training_data["Next_Season"] != 2025].copy() # !!!not having this line is cheating, gives 2025 stats to training data
+    training_data = training_data[training_data["Next_Season"] != 2025].copy() # !!!not having this line is cheating, it would give 2025 stats to training data
 
     # print(f"Test data: {len(target_data)} rows")
     # print(f"Training data: {len(training_data)} rows (2025 removed)")
@@ -124,6 +139,17 @@ def get_target_data(training_data):
 
 #TODO: update to take in year range
 def run(df, target_stat, chosen_model, year_range):
+
+    df['Current_Park_Factor'] = df['Current_Team'].map(park_factors_2024)
+    df['Next_Park_Factor'] = df['Next_Team'].map(park_factors_2024)
+
+    print("Teams missing from park_factors_2024:")
+    print("Current teams:", df[df['Current_Park_Factor'].isna()]['Current_Team'].unique())
+    print("Next teams:", df[df['Next_Park_Factor'].isna()]['Next_Team'].unique())
+
+    #get park factor data
+    #TODO: get park factor dynamically using scraper file instead of hardcoding 2024
+
 
     #extract the 2025 season to be used as a comparison
     target_data, training_data = get_target_data(df)
@@ -138,13 +164,14 @@ def run(df, target_stat, chosen_model, year_range):
     x_train, y_train = get_features(training_data, feature_stats, target_stat)
     x_test, y_test = get_features(target_data, feature_stats, target_stat)
 
-    #pipeline starts
+    #pipeline process:
 
     #handle non-numerical data (Team)
     preprocessor = ColumnTransformer(
         transformers=[
+            
             ("num", StandardScaler(), numerical_features), #linear regression and ridge need values to be standardized to work properly
-            ('cat', OneHotEncoder(handle_unknown='ignore'), categorial_features)
+            #('cat', OneHotEncoder(handle_unknown='ignore'), categorial_features)
         ]
     )
 
@@ -156,31 +183,68 @@ def run(df, target_stat, chosen_model, year_range):
         ]
     )
 
+    df.to_csv('df.csv', index=False)
+    print("Checking for NaN values in training data:")
+    print(x_train.isnull().sum())
+    print("\nRows with NaN:")
+    print(x_train[x_train.isnull().any(axis=1)])
+
     #train model using training dataset
     pipeline.fit(x_train, y_train)
 
     # Get feature names after fitting
-    feature_names = (
-        numerical_features + 
-        list(pipeline.named_steps['preprocessor']
-            .named_transformers_['cat']
-            .get_feature_names_out(categorial_features))
-    )
+    # feature_names = (
+    #     numerical_features + 
+    #     list(pipeline.named_steps['preprocessor']
+    #         .named_transformers_['cat']
+    #         .get_feature_names_out(categorial_features))
+    # )
+    feature_names = numerical_features
 
     #rank which features were most important to each model (Only for RF and XB)
-    # Get feature importances for tree-based models
-    if chosen_model == "Random Forest" or chosen_model == "XGBoost":
-        importances = pipeline.named_steps['model'].feature_importances_
-        
-        # Create importance dataframe
+    # Get SHAP data for tree based models
+    if chosen_model in ["Random Forest", "XGBoost"]:
+
+        model = pipeline.named_steps['model']
+        preprocessor = pipeline.named_steps['preprocessor']
+
+        x_transformed = preprocessor.transform(x_train)
+
+        #get shap values
+        explainer = shap.Explainer(model)
+        shap_values = explainer.shap_values(x_transformed)
+
+        #convert to importance
+        shap_importance = np.abs(shap_values).mean(axis=0)
+
+        #get directionality
+        shap_direction = shap_values.mean(axis=0)
+
         importance_df = pd.DataFrame({
             'Feature': feature_names,
-            'Importance': importances
-        }).sort_values('Importance', ascending=False)
+            'Importance': shap_importance,
+            'Direction': shap_direction
+        }).sort_values('Importance', ascending=False) 
+
+        importance_df["Effect"] = importance_df["Direction"].apply(
+            lambda x: "Increases Prediction" if x > 0 else "Decreases Prediction"
+        )
 
         print(f"\n{chosen_model} - Top 10 Feature Importances:")
         print(importance_df.head(10))
-        print()  # Extra line for readability
+
+    #get coeffs for linear based models   
+    elif chosen_model in ["Linear Regression", "Ridge Regression"]:
+        coefficients = pipeline.named_steps['model'].coef_
+        
+        # Create coefficient dataframe
+        importance_df = pd.DataFrame({
+            'Feature': feature_names,
+            'Coefficient': coefficients
+        }).sort_values('Coefficient', ascending=False, key=abs)  # Sort by absolute value
+        
+        print(f"\n{chosen_model} - Top 10 Feature Coefficients:")
+        print(importance_df)
 
     #final step of pipeline - predict target stat 
     predictions = pipeline.predict(x_test)
@@ -208,6 +272,7 @@ def run(df, target_stat, chosen_model, year_range):
 
     results[chosen_model] = {
         "predictions": predictions,
+        "importance": importance_df if chosen_model in ["Random Forest", "XGBoost", "Linear Regression", "Ridge Regression"] else None,
         "mae": mae,
         "R²": r2,
         "num_players": num_players,
@@ -215,146 +280,9 @@ def run(df, target_stat, chosen_model, year_range):
     print(f"{chosen_model} MAE: {mae:.4f}")
     print(f"{chosen_model} R²: {r2:.4f}")
 
+
+    return mae, r2, num_players, results_df, importance_df
+
+
+
     
-
-    return mae, r2, num_players, results_df
-
-
-
-    pass
-
-
-# training_data = pd.read_csv("../data_prep/prepared_data.csv") 
-
-# #extract 2025 season to be used as comparison
-# target_data, training_data = get_target_data(training_data)
-# print(f"Test data: {len(target_data)} rows")
-# print(f"Training data: {len(training_data)} rows (2025 removed)")
-
-
-# target_stat = "OPS"
-# #separate into input and output
-# stats = get_stats(target_stat)
-# print(stats)
-
-# numeric_features = [f"Current_{stat}" for stat in stats]
-# categorial_features = ["Current_Team", "Next_Team"]
-
-# x_train, y_train = get_features(training_data, stats, target_stat)
-# x_test, y_test = get_features(target_data, stats, target_stat)
-
-# print("\nTest data Next_Team sample:")
-# print(x_test[['Current_Team', 'Next_Team']].head(10))
-
-
-
-
-# #handle non-number values (Team)
-# preprocessor = ColumnTransformer(
-#     transformers=[
-#         ('num', StandardScaler(), numeric_features),
-#         ('cat', OneHotEncoder(handle_unknown='ignore'), categorial_features)
-#     ]
-# )
-
-
-
-# #iterate through models
-# for name, model in models.items():
-#     pipeline = Pipeline(steps=[
-#         ("preprocessor", preprocessor),
-#         ("model", model)
-#     ])
-
-#     pipeline.fit(x_train, y_train)
-    
-#     # Get feature names after fitting
-#     feature_names = (
-#         numeric_features + 
-#         list(pipeline.named_steps['preprocessor']
-#             .named_transformers_['cat']
-#             .get_feature_names_out(categorial_features))
-#     )
-
-#     # Get feature importances for tree-based models
-#     if name == "Random Forest" or name == "XGBoost":
-#         importances = pipeline.named_steps['model'].feature_importances_
-        
-#         # Create importance dataframe
-#         importance_df = pd.DataFrame({
-#             'Feature': feature_names,
-#             'Importance': importances
-#         }).sort_values('Importance', ascending=False)
-        
-#         print(f"\n{name} - Top 10 Feature Importances:")
-#         print(importance_df.head(10))
-#         print()  # Extra line for readability
-
-#     predictions = pipeline.predict(x_test)
-#     y_test_values = y_test.values.flatten()
-
-#     #TODO: add more metrics
-#     mae = mean_absolute_error(y_test, predictions)
-#     r2 = r2_score(y_test, predictions)
-
-#     results[name] = {
-#         "predictions": predictions,
-#         "mae": mae,
-#         "R²": r2
-#     }
-#     print(f"{name} MAE: {mae:.4f}")
-#     print(f"{name} R²: {r2:.4f}")
-
-
-# plt.figure(figsize=(8,8))
-
-# colors = {
-#     "Linear Regression": "blue",
-#     "Ridge Regression": "green",
-#     "Random Forest": "orange",
-#     "XGBoost": "purple"
-# }
-
-# # y = x reference
-# min_val = min(y_test.min(), min(r["predictions"].min() for r in results.values()))
-# max_val = max(y_test.max(), max(r["predictions"].max() for r in results.values()))
-
-# plt.plot(
-#     [min_val, max_val],
-#     [min_val, max_val],
-#     'r--',
-#     label="Perfect Prediction (y = x)"
-# )
-
-# # Plot each model
-# for name, res in results.items():
-#     preds = res["predictions"]
-
-#     # Scatter
-#     plt.scatter(
-#         y_test,
-#         preds,
-#         alpha=0.4,
-#         color=colors[name],
-#         label=f"{name}"
-#     )
-
-#     # Trend line
-#     coef = np.polyfit(y_test, preds, 1)
-#     trend_fn = np.poly1d(coef)
-
-#     x_line = np.linspace(min_val, max_val, 100)
-#     plt.plot(
-#         x_line,
-#         trend_fn(x_line),
-#         color=colors[name],
-#         linestyle='-',
-#         linewidth=2
-#     )
-
-# plt.xlabel("Actual OPS")
-# plt.ylabel("Predicted OPS")
-# plt.title("Predicted vs Actual OPS: Model Comparison")
-# plt.legend()
-# plt.grid(alpha=0.3)
-# plt.show()

@@ -9,10 +9,10 @@ from train_models import pipeline
 
 
 
-st.set_page_config(page_title="MLB Performance Projections", layout="wide", page_icon="⚾")
+st.set_page_config(page_title="MLB Performance Projections", layout="wide", page_icon="")
 
 # Title
-st.title("⚾ MLB Performance Projections")
+st.title("2025 MLB Performance Projections")
 st.markdown("---")
 
 # Horizontal configuration bar
@@ -33,13 +33,14 @@ with col2:
     )
 #TODO: make this affect data (it is a dud rn)
 
-with col3:
-    year_range = st.select_slider(
-        "Training Years",
-        options=list(range(2020, 2025)),
-        value=(2020, 2024),
-        key="years"
-    )
+# with col3:
+#     year_range = st.select_slider(
+#         "Training Years",
+#         options=list(range(2020, 2025)),
+#         value=(2020, 2024),
+#         key="years"
+#     )
+year_range = (2020, 2024)
 
 with col4:
     st.write("")  # Spacing
@@ -63,10 +64,11 @@ if run_button or 'results' in st.session_state:
 
         
         #now that we have the df with correct features, send to pipeline
-        mae, r2, num_players, results_df = pipeline.run(df, target_stat, model_choice, year_range)
+        mae, r2, num_players, results_df, importance_df = pipeline.run(df, target_stat, model_choice, year_range)
         
         st.session_state.results = {
             "training_data": df,
+            "importance_df": importance_df,
             "year_range": year_range,
             'mae': mae,
             'r2': r2,
@@ -88,7 +90,7 @@ if run_button or 'results' in st.session_state:
     st.markdown("")
     
     # Tabs for different views
-    tab1, tab2, tab3 = st.tabs(["📊 Overview", "🔍 Player Search", "🎯 Feature Analysis"])
+    tab1, tab2, tab3 = st.tabs(["Summary", "Player Search", "Feature Analysis"])
     
     with tab1:
         st.subheader("Predicted vs Actual Performance")
@@ -123,7 +125,7 @@ if run_button or 'results' in st.session_state:
                 elif target_stat == "HR":
                     return [0, 65]
                 elif target_stat == "OPS":
-                    return [0.5, 1.2]
+                    return [0.4, 1.2]
                 elif target_stat == "wRC+":
                     return [20, 180]
 
@@ -158,7 +160,7 @@ if run_button or 'results' in st.session_state:
 
             results_df = st.session_state.results['results_df']
 
-            st.markdown("**🔥 Top 5 Overperformers**")
+            st.markdown("**Top 5 Overperformers**")
 
             overperformers = (
                 results_df[results_df['Error'] < 0]
@@ -191,7 +193,7 @@ if run_button or 'results' in st.session_state:
 
             results_df = st.session_state.results['results_df']
 
-            st.markdown("**📉 Top 5 Underperformers**")
+            st.markdown("**Top 5 Underperformers**")
 
             underperformers = (
                 results_df[results_df['Error'] > 0]
@@ -384,46 +386,113 @@ if run_button or 'results' in st.session_state:
                         
                 
         else:
-            st.info("👆 Start typing or click to select a player")
+            st.info("Start typing or click to select a player")
     
     with tab3:
-        st.subheader("Feature Importance Analysis")
+
+        if model_choice in ['Linear Regression', 'Ridge Regression']:
+            measurement = "Coefficient"
+
+            st.subheader(f"Feature {measurement} Analysis")
+
+            feature_data = st.session_state.results['importance_df']
+            
+            try:
+                feature_data['Color'] = feature_data[measurement].apply(lambda x: 'Positive' if x > 0 else 'Negative')
+                fig_features = px.bar(
+                    feature_data,
+                    x=measurement,
+                    y="Feature",
+                    orientation="h",
+                    color="Color",
+                    color_discrete_map={'Positive': 'green', 'Negative': 'red'},
+                    title=f"Top Features for {target_stat} Prediction ({model_choice})"
+                )
+
+                #sort by value not alphabetically
+               
+                fig_features.update_yaxes(categoryorder='total ascending') 
+                
+                st.plotly_chart(fig_features, use_container_width=True)
+            except Exception as e:
+                st.info(f"Press **Run Predictions** above to generate feature {measurement} data.")
+
+
+
+        else:  # tree-based models (SHAP)
+            measurement = "SHAP"
+            feature_data = st.session_state.results['importance_df']
+            # Use signed SHAP values for directionality
+            
+            
+            st.subheader(f"Feature {measurement} Analysis")
+
+            try:
+                feature_data['Color'] = feature_data['Direction'].apply(lambda x: 'Positive' if x > 0 else 'Negative')
+                fig_features = px.bar(
+                    feature_data.sort_values('Importance', ascending=False),
+                    x='Direction',      # signed SHAP value
+                    y="Feature",
+                    orientation="h",
+                    color='Color',
+                    color_discrete_map={'Positive': 'green', 'Negative': 'red'},
+                    title=f"Top Features for {target_stat} Prediction ({model_choice})"
+                )
+                st.plotly_chart(fig_features, use_container_width=True)
+            except Exception as e:
+                st.info(f"Press **Run Predictions** above to generate feature {measurement} data.")
         
-        # TODO: Replace with actual feature importance from your model
-        feature_data = pd.DataFrame({
-            'Feature': ['Current_xwOBA', 'Next_Team_BOS', 'Next_Team_HOU', 'Current_PA', 'Current_HardHit%'],
-            'Importance': [0.063, 0.036, 0.035, 0.028, 0.026]
-        })
         
-        fig_features = px.bar(
-            feature_data,
-            x='Importance',
-            y='Feature',
-            orientation='h',
-            title=f"Top Features for {target_stat} Prediction ({model_choice})"
-        )
+        # Conclusions about what model learned
+        st.markdown("### Key Insights")
+        # st.markdown(f"#### {measurement} Interpretation")
         
-        st.plotly_chart(fig_features, use_container_width=True)
+        if target_stat == "OPS":
+            st.markdown(
+                """
+                - ***Agreements:*** Between all models, strikeout rate (K%) and age were among top negative influencers on OPS performance.
+                - ***Disagreements:*** Tree based models heavily penalized HardHit% and xwOBA, while linear models favored them as positive contributors.
+                - ***Conclusion:***: Linear models seem to more accurately understand baseball logic. Tree based models struggle more because their non-linear nature uses certain stats as anchors too heavily, leading to counterintuitive results.
+                """
+            )
+        elif target_stat == "AVG":
+            st.markdown(
+                """
+                - ***Agreements:*** Overall, BABIP and HardHit% showed the most positive influence between models, while age and K% were negative.
+                - ***Disagreements:*** Tree based models punished PA (Plate Appearances) while linear models did the opposite.
+                - ***Conclusion:*** Linear models seem to be superior for AVG prediction, as they emphasize quality contact more than tree-based models. XGBoost and Random Forest may be overfitting due to noise or failinig to understand the luck factor. These findings seem to suggest that the underlying mechanics of batting average are primarily additive and linear.
+                """
+            )
+        elif target_stat == "HR":
+            st.markdown(
+                """
+                - ***Agreements:*** Top positive metrics across all models included Barrel%, HardHit%, PA, Pull% and FB%. This makes sense as home runs tend to increase with more chances (PA), and better quality of contact (Barrel%, HardHit%) especially when combined with launch angle metrics (FB%, Pull%).
+                - ***Disagreements:*** The linear models see age as a top-three negative factor, while Random Forest interprets it as a slight positive impact on HRs, perhaps capturing the "old man strength" or veteran power hitter profile. Additionally, tree models highlighted HR/FB as a significant positive factor, while linear models did not rank it as highly.
+                - ***Conclusion:*** Random Forest had the lowest MAE and highest $R^2$, indicating that "HR power" is a result of complex interactions (you need both high EV and high FB% to see results) that tree-based models capture better than simple addition. However, XGBoost performed the worst, potentially due to being more sensitive to hyperparameters.
+                """
+            )
+        elif target_stat == "wRC+":
+            st.markdown(
+                """
+                - ***Agreements:*** wOBA and ISO (Isolated Power) tended to be among the top positive influencers, while age was a negative influencer across the models.
+                - ***Disagreements:*** XGBoost seemed to reverse expected baseball logic, penalizing HardHit%, Barrel%, and BB% (Walk Rate), while suprisingly deeming a high K% (Strikeout Rate) as a positive contributor!
+                - ***Conclusion:*** While Random Forest achieved a slightly higher $R^2$, its reliance on a single feature (wOBA) makes it less descriptive than the linear models. The Linear/Ridge models offer a more holistic view by incorporating Barrel% and K% alongside wOBA. The XGBoost model's poor performance (0.245 $R^2$) is explained by its "backwards" interpretation of HardHit% and K%. It appears to have overfitted to noise, whereas the other models maintained more logical relationships.
+                """
+            )
+       
+    
         
-        # Key insights
-        st.markdown("### 💡 Key Insights")
-        st.markdown("""
-        - **xwOBA** is the strongest predictor of future OPS
-        - **Team effects** account for significant variance
-        - **Plate appearances** indicate playing time and sample size
-        """)
+        
+       
 
 else:
-
-    #len_df = st.session_state.results['length_player_seasons']
-
-    # Initial state - show instruction
-    #st.info("👆 Configure your prediction settings and click **Run Predictions** to start")
-    st.info("Machine learning meets baseball. Predict 2025 player stats using 4 years of data, advanced metrics, and ensemble ML models." \
-    "👆 Configure your prediction settings and click **Run Predictions** to start")
+    #what viewer sees before running predictions (landing page)
+   
+    st.info("Machine learning meets baseball. Predict 2025 player stats using 4 years of data, advanced metrics, and multiple ML models." \
+    " Configure your prediction settings and click **Run Predictions** to start")
     
     # Show some quick stats about the dataset
-    st.markdown("### 📊 Dataset Overview")
+    st.markdown("### Dataset Overview")
     
     quick_col1, quick_col2, quick_col3, quick_col4 = st.columns(4)
     with quick_col1:

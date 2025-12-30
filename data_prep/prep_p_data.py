@@ -56,76 +56,17 @@ team_name_id = {
 #     #get list of park factors for team home stadium
 
 def get_input_metrics(stat):
-    if stat == "HR":
-        return [
-            'Age',           # Players peak ~27-30, then decline
-            'PA',            # Playing time (more PAs = more HR opportunities)
-            'HR',            # Last year's HR (best predictor!)
-            'ISO',           # Isolated power (SLG - AVG)
-            'FB%',           # Flyball rate (more flyballs = more HR potential)
-            'HR/FB',         # HR per flyball rate
-            'Barrel%',       # Statcast: % of barrels (ideal contact)
-            'HardHit%',      # Statcast: hard-hit ball rate
-            'EV',            # Exit velocity (harder hit = more HR)
-            'Pull%',         # Pull hitters hit more HR
-        ]
-    elif stat == "AVG":
-        return [
-            'Age',           # Context
-            'PA',            # Playing time
-            'AVG',           # Last year's AVG (best predictor!)
-            'K%',            # Strikeout rate (fewer K = higher AVG)
-            'Contact%',      # Contact rate on swings
-            'BABIP',         # Batting average on balls in play
-            'LD%',           # Line drive rate (line drives = hits)
-            'Hard%',         # Hard-hit ball % (harder = more hits)
-            'Soft%',         # Soft contact % (less = better)
-            'xBA',           # Expected batting average (Statcast)
-        ]
-    elif stat == "OPS":
-        return [
-                'Age',           # Context
-                'PA',            # Playing time
-                'OPS',           # Last year's OPS (best predictor!)
-                'wRC+',          # Weighted runs created (overall value)
-                'BB%',           # Walk rate (boosts OBP)
-                'K%',            # Strikeout rate
-                'ISO',           # Power component
-                'BABIP',         # Luck/contact quality
-                'HardHit%',      # Quality of contact
-                'Barrel%',       # Elite contact
-                'xwOBA',         # Expected wOBA (similar to OPS)
-        ]
-    elif stat == "wRC+":
-        return [
-            'Age',           # Context
-            'PA',            # Playing time
-            'wRC+',          # Last year's wRC+ (best predictor!)
-            'wOBA',          # Foundation of wRC+
-            'BB%',           # Walks
-            'K%',            # Strikeouts
-            'ISO',           # Power
-            'AVG',           # Contact
-            'BABIP',         # Luck factor
-            'Barrel%',       # Quality contact
-            'HardHit%',      # Quality contact
-        ]
-    elif stat == "WAR":
+    if stat == "ERA":
         return [
             "Age",
-            "PA",
-            "G",
-
-            "wOBA",
-            "wRC+",
-            "ISO",
-            "BB%",
             "K%",
-            "Barrel%",
-            "HardHit%",
-            "SB",
-            
+            "K-BB%",
+            "SwStr%",
 
+            "HardHit%",
+            "Barrel%",
+            "EV",
+            "GB%"
         ]
     else:
         return None
@@ -181,7 +122,7 @@ def prep_data(dataset, inputs):
     new_df = pd.DataFrame(machine_learning_dataset)
     return new_df
 
-print("PREP RUNNING")
+print("PREP P RUNNING")
 
 
 
@@ -206,7 +147,7 @@ print("PREP RUNNING")
 #     print(ml_dataset.head())
 
 def run(stat):
-    data = pd.read_csv("data_collection/batting.csv")
+    data = pd.read_csv("data_collection/pitching.csv")
 
     target_stat = stat
 
@@ -219,7 +160,7 @@ def run(stat):
         print(f"Number of player-season pairs: {len(ml_dataset)}")
 
         # Save
-        ml_dataset.to_csv('data_prep/prepared_data.csv', index=False)
+        ml_dataset.to_csv('data_prep/prepared_p_data.csv', index=False)
         print("\n✓ ML data saved to prepared_data.csv")
 
         # Preview
