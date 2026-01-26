@@ -20,7 +20,7 @@ stat_dict = {
     "HR": "Home Runs (HR)",
     "AVG": "Batting Average (AVG)",
     "OPS": "On-base PLus Slugging (OPS)",
-    "wRC+": "Weighted Runs Created Plus (wRC+)",
+    "wRC_PLUS": "Weighted Runs Created Plus (wRC_PLUS)",
 }
 
 refresh()

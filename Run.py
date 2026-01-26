@@ -44,61 +44,61 @@ IMPORTANCE_URIS = {
 
 EVAL_OUTPUT_URI = "s3://mlb-ml-data/evaluation"
 
-TARGET_STATS = ["HR", "AVG", "OPS", "wRC+"]
+TARGET_STATS = ["HR", "AVG", "OPS", "wRC_PLUS"]
 
 
 
-# #ingest raw data
-# run_ingestion(
-#     start_year=2020,
-#     end_year=2025,
-#     min_pa=200,
-#     # output_uri="data/raw/batting.parquet",
-#     output_uri=RAW_DATA_URI
-# )
+#ingest raw data
+run_ingestion(
+    start_year=2020,
+    end_year=2025,
+    min_pa=200,
+    # output_uri="data/raw/batting.parquet",
+    output_uri=RAW_DATA_URI
+)
 
-# for stat in TARGET_STATS:
-#     print(f"Building features for {stat}...")
+for stat in TARGET_STATS:
+    print(f"Building features for {stat}...")
 
-#     run_build_features(
-#         target_stat=stat,
-#         input_uri=RAW_DATA_URI,
-#         output_uri=f"s3://mlb-ml-data/prepared/features_{stat}.parquet"
-#     )
+    run_build_features(
+        target_stat=stat,
+        input_uri=RAW_DATA_URI,
+        output_uri=f"s3://mlb-ml-data/prepared/features_{stat}.parquet"
+    )
 
-# for stat in TARGET_STATS:
-#     print(f"\nTraining models for {stat}...")
+for stat in TARGET_STATS:
+    print(f"\nTraining models for {stat}...")
 
-#     feature_uri = f"s3://mlb-ml-data/prepared/features_{stat}.parquet"
+    feature_uri = f"s3://mlb-ml-data/prepared/features_{stat}.parquet"
 
-#     model_uris = {
-#         "LinearRegression": f"{BASE_MODEL_URI}/{stat}_LinearRegression.pkl",
-#         "Ridge": f"{BASE_MODEL_URI}/{stat}_Ridge.pkl",
-#         "RandomForest": f"{BASE_MODEL_URI}/{stat}_RandomForest.pkl",
-#         "XGBoost": f"{BASE_MODEL_URI}/{stat}_XGBoost.pkl"
-#     }
+    model_uris = {
+        "LinearRegression": f"{BASE_MODEL_URI}/{stat}_LinearRegression.pkl",
+        "Ridge": f"{BASE_MODEL_URI}/{stat}_Ridge.pkl",
+        "RandomForest": f"{BASE_MODEL_URI}/{stat}_RandomForest.pkl",
+        "XGBoost": f"{BASE_MODEL_URI}/{stat}_XGBoost.pkl"
+    }
 
-#     metrics_uris = {
-#         "LinearRegression": f"{BASE_MODEL_URI}/metrics_{stat}_LinearRegression.json",
-#         "Ridge": f"{BASE_MODEL_URI}/metrics_{stat}_Ridge.json",
-#         "RandomForest": f"{BASE_MODEL_URI}/metrics_{stat}_RandomForest.json",
-#         "XGBoost": f"{BASE_MODEL_URI}/metrics_{stat}_XGBoost.json"
-#     }
+    metrics_uris = {
+        "LinearRegression": f"{BASE_MODEL_URI}/metrics_{stat}_LinearRegression.json",
+        "Ridge": f"{BASE_MODEL_URI}/metrics_{stat}_Ridge.json",
+        "RandomForest": f"{BASE_MODEL_URI}/metrics_{stat}_RandomForest.json",
+        "XGBoost": f"{BASE_MODEL_URI}/metrics_{stat}_XGBoost.json"
+    }
 
-#     importance_uris = {
-#         "LinearRegression": f"{BASE_MODEL_URI}/importance_{stat}_LinearRegression.parquet",
-#         "Ridge": f"{BASE_MODEL_URI}/importance_{stat}_Ridge.parquet",
-#         "RandomForest": f"{BASE_MODEL_URI}/importance_{stat}_RandomForest.parquet",
-#         "XGBoost": f"{BASE_MODEL_URI}/importance_{stat}_XGBoost.parquet"
-#     }
+    importance_uris = {
+        "LinearRegression": f"{BASE_MODEL_URI}/importance_{stat}_LinearRegression.parquet",
+        "Ridge": f"{BASE_MODEL_URI}/importance_{stat}_Ridge.parquet",
+        "RandomForest": f"{BASE_MODEL_URI}/importance_{stat}_RandomForest.parquet",
+        "XGBoost": f"{BASE_MODEL_URI}/importance_{stat}_XGBoost.parquet"
+    }
 
-#     train_all_models(
-#         input_uri=feature_uri,
-#         target_stat=stat,
-#         model_uris=model_uris,
-#         metrics_uris=metrics_uris,
-#         importance_uris=importance_uris
-#     )
+    train_all_models(
+        input_uri=feature_uri,
+        target_stat=stat,
+        model_uris=model_uris,
+        metrics_uris=metrics_uris,
+        importance_uris=importance_uris
+    )
 
 for stat in TARGET_STATS:
     print(f"Evaluating models for {stat}...")

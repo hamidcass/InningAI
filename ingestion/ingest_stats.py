@@ -36,6 +36,7 @@ def run_ingestion(start_year: int, end_year: int, min_pa: int, output_uri: str):
     print(f"Total unique players after filtering: {filtered_df['Name'].nunique()}")
 
     save_dataframe(filtered_df, output_uri)
+    filtered_df.to_csv("raw.csv", index=False)
 
     print(f"Data saved to {output_uri}")
     return output_uri

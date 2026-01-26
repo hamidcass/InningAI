@@ -26,7 +26,7 @@ def evaluate_model(model_pipeline, features_df, target_stat):
 
     model_pipeline: sklearn Pipeline or a single trained model
     features_df: df containing features and target
-    target_stat: a string representation of stat: HR, AVG, OPS, WRC+
+    target_stat: a string representation of stat: HR, AVG, OPS, WRC_PLUS
     """
 
     #get x and y
@@ -68,7 +68,7 @@ def run_eval(models_uri, features_uri, output_uri, target_stat):
     models_uri: local path or s3 where trained pipelines are stored
     features_uri: local path or s3 where prepped features are stored
     output_uri: local path or s3 where eval results are stored
-    target_stat: a string representation of stat: HR, AVG, OPS, WRC+
+    target_stat: a string representation of stat: HR, AVG, OPS, WRC_PLUS
     """
 
     print(f"Loading features from {features_uri}")
@@ -94,6 +94,8 @@ def run_eval(models_uri, features_uri, output_uri, target_stat):
         model_pipeline = joblib.load(local_model_path)
 
         metrics, result_df = evaluate_model(model_pipeline, features_df, target_stat)
+
+        print(f"Writing predictions to table: {target_stat.lower()}_{model_name.lower()}_predictions")
 
         # Save predictions
         write_df_to_db(result_df, f"{target_stat.lower()}_{model_name.lower()}_predictions")

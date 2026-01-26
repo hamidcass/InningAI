@@ -87,7 +87,7 @@ def get_input_metrics(stat):
                 'Age',           # Context
                 'PA',            # Playing time
                 'OPS',           # Last year's OPS (best predictor!)
-                'wRC+',          # Weighted runs created (overall value)
+                'wRC_PLUS',          # Weighted runs created (overall value)
                 'BB%',           # Walk rate (boosts OBP)
                 'K%',            # Strikeout rate
                 'ISO',           # Power component
@@ -96,12 +96,12 @@ def get_input_metrics(stat):
                 'Barrel%',       # Elite contact
                 'xwOBA',         # Expected wOBA (similar to OPS)
         ]
-    elif stat == "wRC+":
+    elif stat == "wRC_PLUS":
         return [
             'Age',           # Context
             'PA',            # Playing time
-            'wRC+',          # Last year's wRC+ (best predictor!)
-            'wOBA',          # Foundation of wRC+
+            'wRC_PLUS',          # Last year's wRC_PLUS (best predictor!)
+            'wOBA',          # Foundation of wRC_PLUS
             'BB%',           # Walks
             'K%',            # Strikeouts
             'ISO',           # Power
@@ -117,7 +117,7 @@ def get_input_metrics(stat):
             "G",
 
             "wOBA",
-            "wRC+",
+            "wRC_PLUS",
             "ISO",
             "BB%",
             "K%",

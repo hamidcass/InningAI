@@ -21,7 +21,7 @@ col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 1, 2])
 with col1:
     target_stat = st.selectbox(
         "Target Stat",
-        ["OPS", "HR", "AVG", "wRC+"],
+        ["OPS", "HR", "AVG", "wRC_PLUS"],
         key="target_stat"
     )
 
@@ -126,7 +126,7 @@ if run_button or 'results' in st.session_state:
                     return [0, 65]
                 elif target_stat == "OPS":
                     return [0.4, 1.2]
-                elif target_stat == "wRC+":
+                elif target_stat == "wRC_PLUS":
                     return [20, 180]
 
         # Add perfect prediction line
@@ -180,7 +180,7 @@ if run_button or 'results' in st.session_state:
                     "Actual": "{:.3f}",
                     "Error": "{:.3f}",
                 })
-            else:  # HR, wrc+ (whole numbers)
+            else:  # HR, wrc_plus (whole numbers)
                 styled = styled.format({
                     "Predicted": "{:.0f}",
                     "Actual": "{:.0f}",
@@ -206,7 +206,7 @@ if run_button or 'results' in st.session_state:
                 colour_cells, subset=["Error"]
             )
 
-            if target_stat in ['OPS', 'AVG', 'wRC+']:
+            if target_stat in ['OPS', 'AVG', 'wRC_PLUS']:
                 styled = styled.format({
                     "Predicted": "{:.3f}",
                     "Actual": "{:.3f}",
@@ -231,7 +231,7 @@ if run_button or 'results' in st.session_state:
                 "OPS": [(0.030, "A+"), (0.050, "A"), (0.070, "B"), (0.090, "C"), (0.120, "D")],
                 "HR": [(3, "A+"), (5, "A"), (8, "B"), (12, "C"), (15, "D")],
                 "AVG": [(0.020, "A+"), (0.035, "A"), (0.050, "B"), (0.070, "C"), (0.090, "D")],
-                "wRC+": [(8, "A+"), (15, "A"), (25, "B"), (35, "C"), (45, "D")]
+                "wRC_PLUS": [(8, "A+"), (15, "A"), (25, "B"), (35, "C"), (45, "D")]
             }
             
             for threshold, grade in thresholds[stat_type]:
@@ -282,7 +282,7 @@ if run_button or 'results' in st.session_state:
 
             if target_stat in ['OPS', 'AVG']:
                 fmt = "{:.3f}"
-            else:  # HR, wRC+
+            else:  # HR, wRC_PLUS
                 fmt = "{:.0f}"
             
             with card_col1:
@@ -471,7 +471,7 @@ if run_button or 'results' in st.session_state:
                 - ***Conclusion:*** Random Forest had the lowest MAE and highest $R^2$, indicating that "HR power" is a result of complex interactions (you need both high EV and high FB% to see results) that tree-based models capture better than simple addition. However, XGBoost performed the worst, potentially due to being more sensitive to hyperparameters.
                 """
             )
-        elif target_stat == "wRC+":
+        elif target_stat == "wRC_PLUS":
             st.markdown(
                 """
                 - ***Agreements:*** wOBA and ISO (Isolated Power) tended to be among the top positive influencers, while age was a negative influencer across the models.

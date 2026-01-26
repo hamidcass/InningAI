@@ -2,6 +2,9 @@ from fastapi import FastAPI, HTTPException
 from sqlalchemy import create_engine, text
 import os
 
+from dotenv import load_dotenv
+load_dotenv()
+
 app = FastAPI(title="MLB Prediction API")
 
 DB_USER = os.getenv("DB_USER")
@@ -25,18 +28,18 @@ def get_predictions(stat: str, model: str, limit: int = 20):
         Ex: /predictions?stat=HR&model=XGBoost
     """
 
+    table_name = f"{stat.lower()}_{model.lower()}_predictions"
+
     q = text(f"""
         SELECT * 
-        FROM predictions
-        WHERE stat = :stat
-        AND model = :model
-        ORDER BY player_name
+        FROM {table_name}
+        ORDER BY "Player"
         LIMIT :limit
              """)
     
     try:
         with engine.connect() as conn:
-            result = conn.execute(q, {"stat": stat, "model": model, "limit": limit})
+            result = conn.execute(q, {"limit": limit})
             rows = [dict(row._mapping) for row in result]
         return {
             "stat": stat,
@@ -55,30 +58,40 @@ def get_player_prediction(player_name: str):
         Ex: /player/Mike Trout
     """
 
+    stats = ["hr", "avg", "ops", "wrc_plus"]
+    # stat_changed = stat.lower().replace("+", "plus")
+    models = ["linearregression", "ridge", "randomforest", "xgboost"]
+
+    results = []
+
   
-
     try:
-        q = text(f"""
-            SELECT * 
-            FROM predictions
-            WHERE "Player" ILIKE :player
-            ORDER BY "Next_Season" DESC
-            LIMIT 1
-                    """)
-
-
-
         with engine.connect() as conn:
-                result = conn.execute(q, {"player": f"%{player_name}%"})
-                rows = [dict(row._mapping) for row in result]
-           
-        if not rows:
+            for stat in stats:
+                for model in models:
+                    table_name = f'"{stat}_{model}_predictions"'
+                    q = text(f"""
+                        SELECT *, :stat AS stat, :model AS model 
+                        FROM {table_name}
+                        WHERE "Player" ILIKE :player
+                        ORDER BY "Next_Season" DESC
+                        LIMIT 1
+                             """)
+                    result = conn.execute(q, {
+                        "player": f"%{player_name}%",
+                        "stat": stat.upper(),
+                        "model": model
+                    })
+                    row = result.fetchone()
+                    if row:
+                        results.append(dict(row._mapping))
+        if not results:
             raise HTTPException(status_code=404, detail="Player not found")
         
         return {
             "player": player_name,
-            "count": len(rows),
-            "predictions": rows
+            "count": len(results),
+            "predictions": results
         }
     
 
@@ -88,18 +101,14 @@ def get_player_prediction(player_name: str):
 
 @app.get("/meta")
 def get_metadata():
-    try:
-        q = text("""
-            SELECT DISTINCT stat, model
-            FROM predictions
-            ORDER BY stat, model
-        """)
 
-        with engine.connect() as conn:
-            result = conn.execute(q)
-            rows = [dict(row._mapping) for row in result]
+    stats = ["hr", "avg", "ops", "wrc_plus"]
+    models = ["LinearRegression", "Ridge", "RandomForest", "XGBoost"]
 
-        return {"available_combinations": rows}
+    combos = [
+        {"stat": s, "model": m}
+        for s in stats
+        for m in models
+    ]
 
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return {"available_predictions": combos}

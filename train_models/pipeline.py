@@ -86,7 +86,7 @@ def get_stats(stat):
                 'Age',              
                 'PA',            
                 # 'OPS',           # Last year's OPS
-                'wRC+',          # Weighted runs created (top tier offensive stat in general)
+                'wRC_PLUS',          # Weighted runs created (top tier offensive stat in general)
                 'BB%',           # Walk rate = higher obp = higher ops 
                 'K%',            # Strikeout rate = the more the worse
                 'ISO',           
@@ -95,12 +95,12 @@ def get_stats(stat):
                 'Barrel%',       
                 'xwOBA',         # Expected wOBA (similar to OPS)
         ]
-    elif stat == "wRC+":
+    elif stat == "wRC_PLUS":
         return [
             'Age',           
             'PA',            
-            # 'wRC+',          # Last year's wRC+
-            'wOBA',          # Foundation of wRC+
+            # 'wRC_PLUS',          # Last year's wRC_PLUS
+            'wOBA',          # Foundation of wRC_PLUS
             'BB%',           # Walks = good
             'K%',            # Strikeouts = bad
             'ISO',           
