@@ -1,11 +1,25 @@
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import create_engine, text
+from fastapi.middleware.cors import CORSMiddleware
 import os
 
 from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI(title="MLB Prediction API")
+
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
