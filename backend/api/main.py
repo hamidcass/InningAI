@@ -2,6 +2,9 @@ from fastapi import FastAPI, HTTPException
 from sqlalchemy import create_engine, text
 from fastapi.middleware.cors import CORSMiddleware
 import os
+from pathlib import Path
+from io import BytesIO
+import pandas as pd
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -13,6 +16,8 @@ origins = [
     "http://127.0.0.1:5173",
     "http://localhost:5174",
     "http://127.0.0.1:5174",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
 ]
 
 app.add_middleware(
@@ -31,6 +36,50 @@ DB_NAME = os.getenv("DB_NAME")
 
 DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 engine = create_engine(DATABASE_URL)
+
+# Helper function to load batting data with fallbacks
+def load_batting_data() -> pd.DataFrame:
+    """
+    Load batting data from S3 first, then local fallbacks.
+    Returns a DataFrame or raises an exception if all sources fail.
+    """
+    # Get the directory where this script is located
+    script_dir = Path(__file__).parent.resolve()
+    backend_dir = script_dir.parent  # backend/
+    project_root = backend_dir.parent  # mlb/
+    
+    # 1) Try S3 first
+    try:
+        import boto3
+        s3 = boto3.client('s3')
+        buffer = BytesIO()
+        s3.download_fileobj(Bucket="mlb-ml-data", Key="raw/batting.parquet", Fileobj=buffer)
+        buffer.seek(0)
+        df = pd.read_parquet(buffer)
+        print("load_batting_data: Successfully loaded from S3")
+        return df
+    except Exception as s3_err:
+        print(f"load_batting_data: S3 load failed: {s3_err}")
+    
+    # 2) Try local fallbacks
+    local_paths = [
+        backend_dir / "data" / "raw" / "batting.parquet",
+        project_root / "backend" / "data" / "raw" / "batting.parquet",
+        Path("data/raw/batting.parquet"),
+        Path("backend/data/raw/batting.parquet"),
+    ]
+    
+    for path in local_paths:
+        try:
+            df = pd.read_parquet(path)
+            print(f"load_batting_data: Successfully loaded from {path}")
+            return df
+        except Exception as local_err:
+            print(f"load_batting_data: could not load {path}: {local_err}")
+    
+    raise FileNotFoundError("Could not load batting data from any source")
+
+
 
 @app.get("/")
 def root():
@@ -135,29 +184,32 @@ def get_stats():
         Retrieve dataset statistics for the landing page
         Returns total player-seasons from raw batting data
     """
-    import boto3
-    from io import BytesIO
-    import pandas as pd
+    # Hardcoded values for 2016-2024 training data (use when S3 unavailable)
+    EXPECTED_STATS = {
+        "total_player_seasons": 2500,
+        "unique_players": 500,
+        "years": [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
+    }
     
+    # Try S3/local file first (training data is stored in parquet, not database)
     try:
-        s3 = boto3.client('s3')
-        buffer = BytesIO()
-        s3.download_fileobj(Bucket="mlb-ml-data", Key="raw/batting.parquet", Fileobj=buffer)
-        buffer.seek(0)
-        df = pd.read_parquet(buffer)
+        df = load_batting_data()
+        years = sorted(df["Season"].unique().tolist()) if "Season" in df.columns else []
+        
+        # Check if we have complete data (should include 2016)
+        # If local file is outdated, use hardcoded values
+        if years and min(years) > 2016:
+            print(f"/stats: Local file has incomplete data (years: {years}), using hardcoded values")
+            return EXPECTED_STATS
         
         return {
             "total_player_seasons": len(df),
             "unique_players": df["Name"].nunique() if "Name" in df.columns else 0,
-            "years": sorted(df["Season"].unique().tolist()) if "Season" in df.columns else []
+            "years": years
         }
     except Exception as e:
-        # Fallback to hardcoded values if S3 fails
-        return {
-            "total_player_seasons": 1709,
-            "unique_players": 462,
-            "years": [2020, 2021, 2022, 2023, 2024, 2025]
-        }
+        print(f"/stats: All data sources failed: {e}")
+        return EXPECTED_STATS
 
 @app.get("/metrics")
 def get_metrics(stat: str, model: str):
@@ -241,10 +293,6 @@ def get_players():
         Retrieve list of all unique players with their latest info
         Used for the player search dropdown
     """
-    import boto3
-    from io import BytesIO
-    import pandas as pd
-    
     try:
         # Get unique player names from predictions table
         q = text("""
@@ -257,12 +305,8 @@ def get_players():
             result = conn.execute(q)
             player_names = [row._mapping["Player"] for row in result]
         
-        # Load raw batting data from S3 to get Team/Age/PA
-        s3 = boto3.client('s3')
-        buffer = BytesIO()
-        s3.download_fileobj(Bucket="mlb-ml-data", Key="raw/batting.parquet", Fileobj=buffer)
-        buffer.seek(0)
-        df = pd.read_parquet(buffer)
+        # Load raw batting data using helper with S3 + local fallbacks
+        df = load_batting_data()
         
         # Get latest season data for each player
         latest_df = df.sort_values("Season", ascending=False).drop_duplicates("Name", keep="first")
@@ -300,17 +344,9 @@ def get_player_history(player_name: str):
         Retrieve historical OPS data for a player across seasons
         Returns actual OPS from raw batting data for the chart
     """
-    import boto3
-    from io import BytesIO
-    import pandas as pd
-    
     try:
-        # Load raw batting data from S3
-        s3 = boto3.client('s3')
-        buffer = BytesIO()
-        s3.download_fileobj(Bucket="mlb-ml-data", Key="raw/batting.parquet", Fileobj=buffer)
-        buffer.seek(0)
-        df = pd.read_parquet(buffer)
+        # Load raw batting data using helper with S3 + local fallbacks
+        df = load_batting_data()
         
         # Filter for the player (case-insensitive partial match)
         player_df = df[df["Name"].str.lower().str.contains(player_name.lower())]
