@@ -4,6 +4,7 @@ import Home from "./pages/Home";
 import Predictions from "./pages/Predictions";
 import Search from "./pages/Search";
 import NextSeason from "./pages/NextSeason";
+import NotFound from "./pages/NotFound";
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/predictions" element={<Predictions />} />
         <Route path="/search" element={<Search />} />
         <Route path="/next-season" element={<NextSeason />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );

@@ -342,10 +342,37 @@ export default function Search() {
                 </>
             )}
 
-            {/* Loading State */}
+            {/* Loading State - Skeleton */}
             {loading && (
-                <div className="loading-state">
-                    <p>Loading player data...</p>
+                <div className="search-loading-skeleton">
+                    {/* Player name skeleton */}
+                    <div className="skeleton skeleton-player-name"></div>
+
+                    {/* Player Info skeleton */}
+                    <section className="skeleton-section">
+                        <div className="skeleton skeleton-title" style={{ width: '120px' }}></div>
+                        <div className="skeleton-info-grid">
+                            <div className="skeleton skeleton-info-item"></div>
+                            <div className="skeleton skeleton-info-item"></div>
+                            <div className="skeleton skeleton-info-item"></div>
+                        </div>
+                    </section>
+
+                    {/* Prediction Summary skeleton */}
+                    <section className="skeleton-section">
+                        <div className="skeleton skeleton-title" style={{ width: '200px' }}></div>
+                        <div className="skeleton-prediction-cards">
+                            <div className="skeleton skeleton-prediction-card"></div>
+                            <div className="skeleton skeleton-prediction-card"></div>
+                            <div className="skeleton skeleton-prediction-card"></div>
+                        </div>
+                    </section>
+
+                    {/* Chart skeleton */}
+                    <section className="skeleton-section">
+                        <div className="skeleton skeleton-title" style={{ width: '180px' }}></div>
+                        <div className="skeleton skeleton-history-chart"></div>
+                    </section>
                 </div>
             )}
 

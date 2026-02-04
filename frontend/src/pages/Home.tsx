@@ -36,15 +36,15 @@ export default function Home() {
     <div className="page-container">
       {/* Hero Header */}
       <header className="hero-header hero-landing">
-        <h1>DugoutData: 2025 MLB Offensive Projections</h1>
+        <h1>InningAI: 2025 MLB Offensive Projections</h1>
         <p className="subtitle">
           Harness the power of <span className="highlight">machine learning</span> to predict
           player performance with advanced metrics and multiple ML models.
         </p>
         <p className="hero-description">
-          Our platform combines 9 years of historical data, advanced sabermetrics,
-          and state-of-the-art machine learning algorithms to generate accurate
-          2025 season projections for every MLB player.
+          This platform combines 9 years of historical data, advanced sabermetrics,
+          and machine learning algorithms to generate and compare
+          2025 season projections for every qualified MLB player.
         </p>
         <Link to="/predictions" className="btn-cta">
           Analyze Predictions

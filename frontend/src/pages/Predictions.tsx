@@ -60,6 +60,44 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
     return null;
 }
 
+function LoadingSkeleton() {
+    return (
+        <>
+            {/* Metrics Skeleton */}
+            <section className="skeleton-section">
+                <div className="skeleton skeleton-title"></div>
+                <div className="skeleton-metrics-grid">
+                    <div className="skeleton skeleton-metric-card"></div>
+                    <div className="skeleton skeleton-metric-card"></div>
+                    <div className="skeleton skeleton-metric-card"></div>
+                </div>
+            </section>
+
+            {/* Feature Importance Skeleton */}
+            <section className="skeleton-section">
+                <div className="skeleton skeleton-title"></div>
+                <div className="skeleton skeleton-subtitle"></div>
+                <div className="skeleton skeleton-importance"></div>
+            </section>
+
+            {/* Chart Skeleton */}
+            <section className="skeleton-section">
+                <div className="skeleton skeleton-title"></div>
+                <div className="skeleton skeleton-subtitle"></div>
+                <div className="skeleton skeleton-chart"></div>
+            </section>
+
+            {/* Tables Skeleton */}
+            <section className="skeleton-section">
+                <div className="skeleton-performers-grid">
+                    <div className="skeleton skeleton-table"></div>
+                    <div className="skeleton skeleton-table"></div>
+                </div>
+            </section>
+        </>
+    );
+}
+
 export default function Predictions() {
     const [targetStat, setTargetStat] = useState("OPS");
     const [model, setModel] = useState("XGBoost");
@@ -225,8 +263,11 @@ export default function Predictions() {
                 </div>
             )}
 
+            {/* Loading Skeleton */}
+            {loading && <LoadingSkeleton />}
+
             {/* Model Metrics */}
-            {metrics && (
+            {!loading && metrics && (
                 <section className="metrics-section">
                     <h2>Model Performance</h2>
                     <div className="metrics-grid">
@@ -247,7 +288,7 @@ export default function Predictions() {
             )}
 
             {/* Feature Importance Chart */}
-            {importance.length > 0 && (
+            {!loading && importance.length > 0 && (
                 <section className="importance-section">
                     <h2>Feature Importance</h2>
                     <p className="chart-subtitle">
@@ -275,6 +316,7 @@ export default function Predictions() {
                                         borderRadius: "8px",
                                     }}
                                     labelStyle={{ color: "#e6edf3" }}
+                                    itemStyle={{ color: "#e6edf3" }}
                                 />
                                 <Bar dataKey="Importance" radius={[0, 4, 4, 0]}>
                                     {importanceChartData.map((entry, index) => (
@@ -292,7 +334,7 @@ export default function Predictions() {
             )}
 
             {/* Scatter Plot */}
-            {predictions.length > 0 && (
+            {!loading && predictions.length > 0 && (
                 <section className="chart-section">
                     <h2>Predicted vs Actual {targetStat}</h2>
                     <p className="chart-subtitle">
@@ -446,7 +488,7 @@ export default function Predictions() {
             )}
 
             {/* Top Performers Tables */}
-            {predictions.length > 0 && (
+            {!loading && predictions.length > 0 && (
                 <section className="performers-section">
                     <div className="performers-grid">
                         {/* Overperformers */}
