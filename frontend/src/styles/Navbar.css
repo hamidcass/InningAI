@@ -15,8 +15,7 @@
 .navbar-container {
   display: flex;
   align-items: center;
-  justify-content: center;
-  position: relative;
+  justify-content: space-between;
   height: 100%;
   max-width: 1280px;
   margin: 0 auto;
@@ -25,13 +24,12 @@
 
 /* Logo */
 .navbar-logo {
-  position: absolute;
-  left: 0;
   display: flex;
   align-items: center;
   gap: 0.5rem;
   text-decoration: none;
   transition: opacity 0.2s ease;
+  z-index: 1002;
 }
 
 .navbar-logo:hover {
@@ -54,7 +52,7 @@
   font-weight: 600;
 }
 
-/* Navigation Menu */
+/* Navigation Menu (Desktop) */
 .nav-menu {
   display: flex;
   align-items: center;
@@ -90,10 +88,16 @@
   background: var(--accent-cyan-dim);
 }
 
+/* Navbar Actions */
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  z-index: 1002;
+}
+
 /* Theme Toggle */
 .theme-toggle {
-  position: absolute;
-  right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -123,15 +127,84 @@
   color: var(--accent-cyan);
 }
 
+/* Mobile Menu Button */
+.mobile-menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  z-index: 1002;
+}
+
+.mobile-menu-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Mobile Menu Overlay */
+.mobile-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background: var(--bg-primary);
+  padding-top: 80px;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease-in-out;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mobile-menu.open {
+  transform: translateY(0);
+}
+
+.mobile-nav-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+.mobile-nav-link {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.mobile-nav-link.active,
+.mobile-nav-link:hover {
+  color: var(--accent-cyan);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .navbar-container {
     padding: 0 1rem;
   }
 
-  .nav-link {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.85rem;
+  /* Hide desktop menu */
+  .desktop-menu {
+    display: none;
+  }
+
+  /* Show mobile menu button */
+  .mobile-menu-btn {
+    display: flex;
   }
 
   .logo-text {
