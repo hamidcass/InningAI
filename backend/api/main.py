@@ -101,6 +101,10 @@ def load_batting_data() -> pd.DataFrame:
     raise FileNotFoundError("Could not load batting data from any source")
 
 
+# Helper: strip version suffix from model name (e.g. "XGBoost:1" -> "XGBoost")
+def clean_model_name(model: str) -> str:
+    return model.split(":")[0]
+
 
 @app.get("/")
 def root():
@@ -113,7 +117,7 @@ def get_predictions(stat: str, model: str, limit: int = 10000):
         Retrieve the latest predictions for a specified model
         Ex: /predictions?stat=HR&model=XGBoost
     """
-
+    model = clean_model_name(model)
     table_name = f"{stat.lower()}_{model.lower()}_predictions"
 
     q = text(f"""
@@ -238,6 +242,7 @@ def get_metrics(stat: str, model: str):
         Retrieve model performance metrics (MAE, R2) for a specified stat/model
         Ex: /metrics?stat=HR&model=XGBoost
     """
+    model = clean_model_name(model)
     table_name = f"{stat.lower()}_{model.lower()}_metrics"
 
     q = text(f"""
@@ -274,6 +279,8 @@ def get_importance(stat: str, model: str):
     import boto3
     from io import BytesIO
     import pandas as pd
+    
+    model = clean_model_name(model)
     
     # Map model names to match file naming convention
     model_map = {
