@@ -309,23 +309,33 @@ def get_players():
             result = conn.execute(q)
             player_names = [row._mapping["Player"] for row in result]
         
-        # Load raw batting data using helper with S3 + local fallbacks
-        df = load_batting_data()
-        
-        # Get latest season data for each player
-        latest_df = df.sort_values("Season", ascending=False).drop_duplicates("Name", keep="first")
+        # Try to load raw batting data for enrichment (Team, Age, PA)
+        latest_df = None
+        try:
+            df = load_batting_data()
+            latest_df = df.sort_values("Season", ascending=False).drop_duplicates("Name", keep="first")
+        except Exception as batting_err:
+            print(f"/players: Could not load batting data for enrichment: {batting_err}")
         
         players = []
         for name in player_names:
-            player_data = latest_df[latest_df["Name"] == name]
-            if not player_data.empty:
-                row = player_data.iloc[0]
-                players.append({
-                    "Player": name,
-                    "Team": row.get("Team", "N/A"),
-                    "Age": int(row.get("Age", 0)) if pd.notna(row.get("Age")) else None,
-                    "PA": int(row.get("PA", 0)) if pd.notna(row.get("PA")) else None
-                })
+            if latest_df is not None:
+                player_data = latest_df[latest_df["Name"] == name]
+                if not player_data.empty:
+                    row = player_data.iloc[0]
+                    players.append({
+                        "Player": name,
+                        "Team": row.get("Team", "N/A"),
+                        "Age": int(row.get("Age", 0)) if pd.notna(row.get("Age")) else None,
+                        "PA": int(row.get("PA", 0)) if pd.notna(row.get("PA")) else None
+                    })
+                else:
+                    players.append({
+                        "Player": name,
+                        "Team": "N/A",
+                        "Age": None,
+                        "PA": None
+                    })
             else:
                 players.append({
                     "Player": name,
