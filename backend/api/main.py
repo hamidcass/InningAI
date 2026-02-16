@@ -65,7 +65,7 @@ def load_batting_data() -> pd.DataFrame:
     except Exception as s3_err:
         print(f"load_batting_data: S3 load failed: {s3_err}")
     
-    # 2) Try local fallbacks
+    # 2) Try local parquet fallbacks
     local_paths = [
         backend_dir / "data" / "raw" / "batting.parquet",
         project_root / "backend" / "data" / "raw" / "batting.parquet",
@@ -80,6 +80,23 @@ def load_batting_data() -> pd.DataFrame:
             return df
         except Exception as local_err:
             print(f"load_batting_data: could not load {path}: {local_err}")
+    
+    # 3) Try raw.csv fallback
+    csv_paths = [
+        backend_dir / "raw.csv",
+        project_root / "backend" / "raw.csv",
+        backend_dir.parent / "raw.csv",
+        Path("raw.csv"),
+        Path("backend/raw.csv"),
+    ]
+    
+    for path in csv_paths:
+        try:
+            df = pd.read_csv(path)
+            print(f"load_batting_data: Successfully loaded from CSV {path}")
+            return df
+        except Exception as csv_err:
+            print(f"load_batting_data: could not load CSV {path}: {csv_err}")
     
     raise FileNotFoundError("Could not load batting data from any source")
 
