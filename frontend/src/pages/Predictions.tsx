@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { motion, useInView } from "framer-motion";
 import {
     ScatterChart,
     Scatter,
@@ -13,6 +14,7 @@ import {
     Cell,
 } from "recharts";
 import { fetchAllPredictions, fetchMetrics, fetchImportance } from "../api/api";
+import { useDesignTheme } from "../hooks/useDesignTheme";
 
 interface Prediction {
     Player: string;
@@ -43,6 +45,89 @@ interface CustomTooltipProps {
     payload?: Array<{ payload: Prediction }>;
 }
 
+function AnimatedValue({ value, decimals = 4 }: { value: number; decimals?: number }) {
+    const [display, setDisplay] = useState(0);
+    const ref = useRef<HTMLSpanElement>(null);
+    const inView = useInView(ref, { once: true });
+
+    useEffect(() => {
+        if (!inView) return;
+        let frame: number;
+        const duration = 1200;
+        const start = performance.now();
+        const tick = (now: number) => {
+            const progress = Math.min((now - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            setDisplay(eased * value);
+            if (progress < 1) frame = requestAnimationFrame(tick);
+        };
+        frame = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(frame);
+    }, [inView, value]);
+
+    return <span ref={ref}>{display.toFixed(decimals)}</span>;
+}
+
+function AnimatedInt({ value }: { value: number }) {
+    const [display, setDisplay] = useState(0);
+    const ref = useRef<HTMLSpanElement>(null);
+    const inView = useInView(ref, { once: true });
+
+    useEffect(() => {
+        if (!inView) return;
+        let frame: number;
+        const duration = 1200;
+        const start = performance.now();
+        const tick = (now: number) => {
+            const progress = Math.min((now - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            setDisplay(Math.round(eased * value));
+            if (progress < 1) frame = requestAnimationFrame(tick);
+        };
+        frame = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(frame);
+    }, [inView, value]);
+
+    return <span ref={ref}>{display}</span>;
+}
+
+const fadeUp = {
+    hidden: { opacity: 0, y: 24 },
+    visible: (i: number) => ({
+        opacity: 1,
+        y: 0,
+        transition: {
+            delay: i * 0.09,
+            duration: 0.5,
+            ease: [0.22, 1, 0.36, 1],
+        },
+    }),
+};
+
+const stagger = {
+    hidden: {},
+    visible: { transition: { staggerChildren: 0.08 } },
+};
+
+const sectionIn = {
+    hidden: { opacity: 0, y: 28 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] },
+    },
+};
+
+const cardIn = {
+    hidden: { opacity: 0, y: 16, scale: 0.97 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
+    },
+};
+
 function CustomTooltip({ active, payload }: CustomTooltipProps) {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
@@ -63,7 +148,6 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
 function LoadingSkeleton() {
     return (
         <>
-            {/* Metrics Skeleton */}
             <section className="skeleton-section">
                 <div className="skeleton skeleton-title"></div>
                 <div className="skeleton-metrics-grid">
@@ -72,22 +156,16 @@ function LoadingSkeleton() {
                     <div className="skeleton skeleton-metric-card"></div>
                 </div>
             </section>
-
-            {/* Feature Importance Skeleton */}
             <section className="skeleton-section">
                 <div className="skeleton skeleton-title"></div>
                 <div className="skeleton skeleton-subtitle"></div>
                 <div className="skeleton skeleton-importance"></div>
             </section>
-
-            {/* Chart Skeleton */}
             <section className="skeleton-section">
                 <div className="skeleton skeleton-title"></div>
                 <div className="skeleton skeleton-subtitle"></div>
                 <div className="skeleton skeleton-chart"></div>
             </section>
-
-            {/* Tables Skeleton */}
             <section className="skeleton-section">
                 <div className="skeleton-performers-grid">
                     <div className="skeleton skeleton-table"></div>
@@ -99,6 +177,8 @@ function LoadingSkeleton() {
 }
 
 export default function Predictions() {
+    const colors = useDesignTheme();
+
     const [targetStat, setTargetStat] = useState("OPS");
     const [model, setModel] = useState("XGBoost");
     const [predictions, setPredictions] = useState<Prediction[]>([]);
@@ -107,16 +187,13 @@ export default function Predictions() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Zoom state (10 = no zoom, 100 = max zoom)
     const [zoomLevel, setZoomLevel] = useState(10);
     const [panX, setPanX] = useState(50);
     const [panY, setPanY] = useState(50);
 
-    // Player search state
     const [searchQuery, setSearchQuery] = useState("");
     const [highlightedPlayer, setHighlightedPlayer] = useState<string | null>(null);
 
-    // Auto-load predictions on mount with default settings (XGBoost + OPS)
     const loadPredictions = async (stat: string, modelName: string) => {
         setLoading(true);
         setError(null);
@@ -128,12 +205,10 @@ export default function Predictions() {
         try {
             const [predData, metricsData] = await Promise.all([
                 fetchAllPredictions(stat, modelName),
-                fetchMetrics(stat, modelName)
+                fetchMetrics(stat, modelName),
             ]);
             setPredictions(predData.predictions || []);
             setMetrics(metricsData);
-
-            // Try to fetch importance (may fail for some models)
             try {
                 const importanceData = await fetchImportance(stat, modelName);
                 setImportance(importanceData.features || []);
@@ -150,18 +225,13 @@ export default function Predictions() {
         }
     };
 
-    // Load default predictions on page mount
     useEffect(() => {
         loadPredictions(targetStat, model);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    const handleRunPredictions = () => loadPredictions(targetStat, model);
 
-    const handleRunPredictions = () => {
-        loadPredictions(targetStat, model);
-    };
-
-    // Calculate base domain
     const allValues = predictions.flatMap(p => [p.Actual, p.Predicted]);
     const dataMin = allValues.length ? Math.min(...allValues) : 0;
     const dataMax = allValues.length ? Math.max(...allValues) : 1;
@@ -170,9 +240,8 @@ export default function Predictions() {
     const baseMax = dataMax + dataRange * 0.05;
     const fullRange = baseMax - baseMin;
 
-    // Calculate zoomed domain (invert zoomLevel so 100 = full view, lower = more zoom)
     const zoomedDomain = useMemo(() => {
-        const effectiveZoom = 110 - zoomLevel; // Invert: slider 10 = view 100%, slider 100 = view 10%
+        const effectiveZoom = 110 - zoomLevel;
         const viewRange = (fullRange * effectiveZoom) / 100;
         const halfView = viewRange / 2;
         const centerX = baseMin + (fullRange * panX) / 100;
@@ -185,7 +254,6 @@ export default function Predictions() {
         };
     }, [zoomLevel, panX, panY, baseMin, baseMax, fullRange]);
 
-    // Filter predictions for search
     const filteredPlayers = useMemo(() => {
         if (!searchQuery.trim()) return [];
         return predictions
@@ -204,92 +272,118 @@ export default function Predictions() {
         setSearchQuery("");
     };
 
-    // Prepare importance data for chart (top 10)
     const importanceChartData = importance.slice(0, 10).map(f => ({
         ...f,
         Feature: f.Feature.replace("Current_", ""),
-        fill: f.Direction && f.Direction > 0 ? "#4dc9ff" : "#ff6b5b"
+        fill: f.Direction && f.Direction > 0 ? colors.positiveDir : colors.negativeDir,
     }));
 
     return (
         <div className="page-container">
-            {/* Page Header */}
-            <header className="hero-header">
-                <h1>Run Predictions</h1>
-                <p className="subtitle">
-                    Select your target stat and model to generate{" "}
-                    <span className="highlight">2025 MLB projections</span>.
-                </p>
-            </header>
+            {/* Hero */}
+            <motion.header
+                className="hero-header"
+                initial="hidden"
+                animate="visible"
+            >
+                <motion.h1 variants={fadeUp} custom={0}>
+                    Run <span className="highlight">Predictions</span>
+                </motion.h1>
+                <motion.p className="subtitle" variants={fadeUp} custom={1}>
+                    Select your target stat and model to generate 2025 MLB projections.
+                </motion.p>
+            </motion.header>
 
             {/* Control Panel */}
-            <div className="control-panel">
+            <motion.div
+                className="control-panel"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.18, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            >
                 <div className="control-group">
                     <label>Target Stat</label>
-                    <select
-                        value={targetStat}
-                        onChange={(e) => setTargetStat(e.target.value)}
-                    >
+                    <select value={targetStat} onChange={e => setTargetStat(e.target.value)}>
                         <option value="OPS">OPS</option>
                         <option value="AVG">AVG</option>
                         <option value="HR">HR</option>
                         <option value="wRC_PLUS">wRC+</option>
                     </select>
                 </div>
-
                 <div className="control-group">
                     <label>Model</label>
-                    <select value={model} onChange={(e) => setModel(e.target.value)}>
+                    <select value={model} onChange={e => setModel(e.target.value)}>
                         <option value="XGBoost">XGBoost</option>
                         <option value="RandomForest">Random Forest</option>
                         <option value="LinearRegression">Linear Regression</option>
                         <option value="Ridge">Ridge</option>
                     </select>
                 </div>
-
-                <button
-                    className="btn-primary"
-                    onClick={handleRunPredictions}
-                    disabled={loading}
-                >
+                <button className="btn-primary" onClick={handleRunPredictions} disabled={loading}>
                     {loading ? "Loading..." : "Run Predictions"}
                 </button>
-            </div>
+            </motion.div>
 
-            {/* Error Message */}
             {error && (
-                <div className="error-banner">
+                <motion.div
+                    className="error-banner"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                >
                     {error}
-                </div>
+                </motion.div>
             )}
 
-            {/* Loading Skeleton */}
             {loading && <LoadingSkeleton />}
 
-            {/* Model Metrics */}
+            {/* Metrics */}
             {!loading && metrics && (
-                <section className="metrics-section">
-                    <h2>Model Performance</h2>
-                    <div className="metrics-grid">
-                        <div className="metric-card">
+                <motion.section
+                    className="metrics-section"
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true }}
+                    variants={stagger}
+                >
+                    <motion.h2 variants={sectionIn}>Model Performance</motion.h2>
+                    <motion.div className="metrics-grid" variants={stagger}>
+                        <motion.div className="metric-card" variants={cardIn}>
                             <div className="metric-label">Mean Absolute Error</div>
-                            <div className="metric-value">{metrics.MAE.toFixed(4)}</div>
-                        </div>
-                        <div className="metric-card">
+                            <div className="metric-value"><AnimatedValue value={metrics.MAE} /></div>
+                        </motion.div>
+                        <motion.div className="metric-card" variants={cardIn}>
                             <div className="metric-label">R² Score</div>
-                            <div className="metric-value">{metrics.R2.toFixed(4)}</div>
-                        </div>
-                        <div className="metric-card">
+                            <div className="metric-value"><AnimatedValue value={metrics.R2} /></div>
+                        </motion.div>
+                        <motion.div className="metric-card" variants={cardIn}>
                             <div className="metric-label">Players Evaluated</div>
-                            <div className="metric-value">{metrics.Num_Players}</div>
-                        </div>
-                    </div>
-                </section>
+                            <div className="metric-value"><AnimatedInt value={metrics.Num_Players} /></div>
+                        </motion.div>
+                    </motion.div>
+                </motion.section>
             )}
 
-            {/* Feature Importance Chart */}
+            {/* Glow Line */}
+            {!loading && metrics && (
+                <motion.hr
+                    className="glow-line"
+                    initial={{ opacity: 0, scaleX: 0 }}
+                    whileInView={{ opacity: 1, scaleX: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                />
+            )}
+
+            {/* Feature Importance */}
             {!loading && importance.length > 0 && (
-                <section className="importance-section">
+                <motion.section
+                    className="importance-section"
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-40px" }}
+                    variants={sectionIn}
+                >
                     <h2>Feature Importance</h2>
                     <p className="chart-subtitle">
                         Top factors driving {model} predictions for {targetStat}
@@ -302,22 +396,22 @@ export default function Predictions() {
                                     layout="vertical"
                                     margin={{ top: 10, right: 30, left: 100, bottom: 10 }}
                                 >
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#2d3748" />
-                                    <XAxis type="number" tick={{ fill: "#8b949e" }} />
+                                    <CartesianGrid strokeDasharray="3 3" stroke={colors.gridStroke} />
+                                    <XAxis type="number" tick={{ fill: colors.tickFill }} />
                                     <YAxis
                                         type="category"
                                         dataKey="Feature"
-                                        tick={{ fill: "#8b949e", fontSize: 12 }}
+                                        tick={{ fill: colors.tickFill, fontSize: 12 }}
                                         width={90}
                                     />
                                     <Tooltip
                                         contentStyle={{
-                                            background: "#1a1f2e",
-                                            border: "1px solid #2d3748",
+                                            background: colors.tooltipBg,
+                                            border: `1px solid ${colors.tooltipBorder}`,
                                             borderRadius: "8px",
                                         }}
-                                        labelStyle={{ color: "#e6edf3" }}
-                                        itemStyle={{ color: "#e6edf3" }}
+                                        labelStyle={{ color: colors.tooltipText }}
+                                        itemStyle={{ color: colors.tooltipText }}
                                     />
                                     <Bar dataKey="Importance" radius={[0, 4, 4, 0]}>
                                         {importanceChartData.map((entry, index) => (
@@ -329,38 +423,50 @@ export default function Predictions() {
                         </div>
                     </div>
                     <p className="importance-legend">
-                        <span className="legend-dot cyan"></span> Increases prediction
-                        <span className="legend-dot coral"></span> Decreases prediction
+                        <span className="legend-dot positive-dir"></span> Increases prediction
+                        <span className="legend-dot negative-dir"></span> Decreases prediction
                     </p>
-                </section>
+                </motion.section>
             )}
 
-            {/* Scatter Plot */}
+            {/* Glow Line */}
+            {!loading && importance.length > 0 && (
+                <motion.hr
+                    className="glow-line"
+                    initial={{ opacity: 0, scaleX: 0 }}
+                    whileInView={{ opacity: 1, scaleX: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                />
+            )}
+
+            {/* Scatter Chart */}
             {!loading && predictions.length > 0 && (
-                <section className="chart-section">
+                <motion.section
+                    className="chart-section"
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-40px" }}
+                    variants={sectionIn}
+                >
                     <h2>Predicted vs Actual {targetStat}</h2>
                     <p className="chart-subtitle">
-                        {predictions.length} players • {model} model
-                        {highlightedPlayer && <span className="highlight-badge"> • Showing: {highlightedPlayer}</span>}
+                        {predictions.length} players &bull; {model} model
+                        {highlightedPlayer && <span className="highlight-badge"> &bull; Showing: {highlightedPlayer}</span>}
                     </p>
 
-                    {/* Player Search */}
                     <div className="player-search">
                         <input
                             type="text"
                             placeholder="Search for a player..."
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onChange={e => setSearchQuery(e.target.value)}
                             className="search-input"
                         />
                         {filteredPlayers.length > 0 && (
                             <div className="search-results">
                                 {filteredPlayers.map((p, i) => (
-                                    <div
-                                        key={i}
-                                        className="search-result-item"
-                                        onClick={() => handlePlayerSelect(p.Player)}
-                                    >
+                                    <div key={i} className="search-result-item" onClick={() => handlePlayerSelect(p.Player)}>
                                         <span className="player-name">{p.Player}</span>
                                         <span className="player-stats">
                                             Actual: {p.Actual.toFixed(3)} | Pred: {p.Predicted.toFixed(3)}
@@ -370,25 +476,19 @@ export default function Predictions() {
                             </div>
                         )}
                         {highlightedPlayer && (
-                            <button
-                                className="btn-clear-highlight"
-                                onClick={() => setHighlightedPlayer(null)}
-                            >
+                            <button className="btn-clear-highlight" onClick={() => setHighlightedPlayer(null)}>
                                 Clear highlight
                             </button>
                         )}
                     </div>
 
-                    {/* Zoom Controls */}
                     <div className="zoom-controls">
                         <div className="zoom-control-group">
                             <label>Zoom</label>
                             <input
-                                type="range"
-                                min="10"
-                                max="100"
+                                type="range" min="10" max="100"
                                 value={zoomLevel}
-                                onChange={(e) => setZoomLevel(Number(e.target.value))}
+                                onChange={e => setZoomLevel(Number(e.target.value))}
                                 className="zoom-slider"
                             />
                             <span className="zoom-value">{Math.round(zoomLevel / 10)}x</span>
@@ -396,11 +496,9 @@ export default function Predictions() {
                         <div className="zoom-control-group">
                             <label>Pan X</label>
                             <input
-                                type="range"
-                                min="0"
-                                max="100"
+                                type="range" min="0" max="100"
                                 value={panX}
-                                onChange={(e) => setPanX(Number(e.target.value))}
+                                onChange={e => setPanX(Number(e.target.value))}
                                 className="zoom-slider"
                                 disabled={zoomLevel === 10}
                             />
@@ -408,52 +506,33 @@ export default function Predictions() {
                         <div className="zoom-control-group">
                             <label>Pan Y</label>
                             <input
-                                type="range"
-                                min="0"
-                                max="100"
+                                type="range" min="0" max="100"
                                 value={panY}
-                                onChange={(e) => setPanY(Number(e.target.value))}
+                                onChange={e => setPanY(Number(e.target.value))}
                                 className="zoom-slider"
                                 disabled={zoomLevel === 10}
                             />
                         </div>
-                        <button className="btn-reset" onClick={handleResetZoom}>
-                            Reset View
-                        </button>
+                        <button className="btn-reset" onClick={handleResetZoom}>Reset View</button>
                     </div>
 
                     <div className="scatter-container">
                         <div className="chart-scroll-wrapper">
                             <ResponsiveContainer width="100%" height={500}>
                                 <ScatterChart margin={{ top: 20, right: 30, bottom: 60, left: 60 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#2d3748" />
+                                    <CartesianGrid strokeDasharray="3 3" stroke={colors.gridStroke} />
                                     <XAxis
-                                        type="number"
-                                        dataKey="Actual"
-                                        name="Actual"
+                                        type="number" dataKey="Actual" name="Actual"
                                         domain={[zoomedDomain.xMin, zoomedDomain.xMax]}
-                                        tick={{ fill: "#8b949e" }}
-                                        label={{
-                                            value: `Actual ${targetStat}`,
-                                            position: "bottom",
-                                            offset: 40,
-                                            fill: "#8b949e",
-                                        }}
+                                        tick={{ fill: colors.tickFill }}
+                                        label={{ value: `Actual ${targetStat}`, position: "bottom", offset: 40, fill: colors.tickFill }}
                                         allowDataOverflow
                                     />
                                     <YAxis
-                                        type="number"
-                                        dataKey="Predicted"
-                                        name="Predicted"
+                                        type="number" dataKey="Predicted" name="Predicted"
                                         domain={[zoomedDomain.yMin, zoomedDomain.yMax]}
-                                        tick={{ fill: "#8b949e" }}
-                                        label={{
-                                            value: `Predicted ${targetStat}`,
-                                            angle: -90,
-                                            position: "left",
-                                            offset: 40,
-                                            fill: "#8b949e",
-                                        }}
+                                        tick={{ fill: colors.tickFill }}
+                                        label={{ value: `Predicted ${targetStat}`, angle: -90, position: "left", offset: 40, fill: colors.tickFill }}
                                         allowDataOverflow
                                     />
                                     <Tooltip content={<CustomTooltip />} />
@@ -462,21 +541,19 @@ export default function Predictions() {
                                             { x: zoomedDomain.xMin, y: zoomedDomain.xMin },
                                             { x: zoomedDomain.xMax, y: zoomedDomain.xMax },
                                         ]}
-                                        stroke="#ff6b5b"
+                                        stroke={colors.accent2}
                                         strokeDasharray="5 5"
                                         strokeWidth={2}
                                     />
-                                    {/* Regular scatter points */}
                                     <Scatter
                                         data={predictions.filter(p => p.Player !== highlightedPlayer)}
-                                        fill="#4dc9ff"
+                                        fill={colors.scatterDot}
                                         fillOpacity={highlightedPlayer ? 0.3 : 0.7}
                                     />
-                                    {/* Highlighted player */}
                                     {highlightedPlayer && (
                                         <Scatter
                                             data={predictions.filter(p => p.Player === highlightedPlayer)}
-                                            fill="#fbbf24"
+                                            fill={colors.highlight}
                                             fillOpacity={1}
                                             shape="star"
                                         />
@@ -488,15 +565,31 @@ export default function Predictions() {
                     <p className="chart-legend">
                         <span className="legend-line"></span> Perfect prediction line (y = x)
                     </p>
-                </section>
+                </motion.section>
             )}
 
-            {/* Top Performers Tables */}
+            {/* Glow Line */}
             {!loading && predictions.length > 0 && (
-                <section className="performers-section">
-                    <div className="performers-grid">
-                        {/* Overperformers */}
-                        <div className="performers-table">
+                <motion.hr
+                    className="glow-line"
+                    initial={{ opacity: 0, scaleX: 0 }}
+                    whileInView={{ opacity: 1, scaleX: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                />
+            )}
+
+            {/* Performers */}
+            {!loading && predictions.length > 0 && (
+                <motion.section
+                    className="performers-section"
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-40px" }}
+                    variants={stagger}
+                >
+                    <motion.div className="performers-grid" variants={stagger}>
+                        <motion.div className="performers-table" variants={cardIn}>
                             <h3>Top 5 Overperformers</h3>
                             <div className="table-scroll-wrapper">
                                 <table>
@@ -523,10 +616,9 @@ export default function Predictions() {
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
+                        </motion.div>
 
-                        {/* Underperformers */}
-                        <div className="performers-table">
+                        <motion.div className="performers-table" variants={cardIn}>
                             <h3>Top 5 Underperformers</h3>
                             <div className="table-scroll-wrapper">
                                 <table>
@@ -553,16 +645,22 @@ export default function Predictions() {
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
-                    </div>
-                </section>
+                        </motion.div>
+                    </motion.div>
+                </motion.section>
             )}
 
             {/* Info Banner */}
-            <div className="info-banner">
+            <motion.div
+                className="info-banner"
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            >
                 Predict 2025 player stats using 9 years of historical data, advanced sabermetrics,
                 and various ML models. Configure your settings and click Run Predictions to get started.
-            </div>
+            </motion.div>
         </div>
     );
 }

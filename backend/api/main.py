@@ -211,7 +211,7 @@ def get_stats():
     """
     # Hardcoded values for 2016-2024 training data (use when S3 unavailable)
     EXPECTED_STATS = {
-        "total_player_seasons": 2500,
+        "total_player_seasons": 3076,
         "unique_players": 500,
         "years": [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
     }
