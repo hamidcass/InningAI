@@ -67,24 +67,11 @@ const fadeUp = {
         transition: {
             delay: i * 0.08,
             duration: 0.45,
-            ease: [0.22, 1, 0.36, 1],
+            ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
         },
     }),
 };
 
-const sectionIn = {
-    hidden: { opacity: 0, y: 16 },
-    visible: {
-        opacity: 1,
-        y: 0,
-        transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
-    },
-    exit: {
-        opacity: 0,
-        y: -8,
-        transition: { duration: 0.2 },
-    },
-};
 
 export default function Search() {
     const colors = useDesignTheme();
@@ -167,7 +154,7 @@ export default function Search() {
                 className="search-header"
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] }}
             >
                 <label className="search-label">Search for a player</label>
                 <div className="search-dropdown-container">
@@ -190,7 +177,7 @@ export default function Search() {
                                 initial={{ opacity: 0, y: -4, scale: 0.97 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: -4, scale: 0.97 }}
-                                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] }}
                                 style={{ transformOrigin: 'top center' }}
                             >
                                 {filteredPlayers.map((p, i) => (

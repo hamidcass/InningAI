@@ -43,7 +43,7 @@ const fadeUp = {
     transition: {
       delay: i * 0.1,
       duration: 0.6,
-      ease: [0.22, 1, 0.36, 1],
+      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
     },
   }),
 };
@@ -58,7 +58,7 @@ const stepVariant = {
   visible: {
     opacity: 1,
     x: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
   },
 };
 
@@ -68,7 +68,7 @@ const diamondVariant = {
     opacity: 1,
     scale: 1,
     rotate: 45,
-    transition: { delay: 0.4, duration: 1.2, ease: [0.22, 1, 0.36, 1] },
+    transition: { delay: 0.4, duration: 1.2, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
   },
 };
 
@@ -143,7 +143,7 @@ export default function Home() {
         className="glow-line"
         initial={{ opacity: 0, scaleX: 0 }}
         animate={{ opacity: 1, scaleX: 1 }}
-        transition={{ delay: 0.5, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ delay: 0.5, duration: 0.8, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] }}
       />
 
       {/* Stats Strip with animated counters */}
@@ -151,7 +151,7 @@ export default function Home() {
         className="stats-strip"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ delay: 0.4, duration: 0.6, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] }}
       >
         <div className="strip-item">
           <span className="strip-value">
@@ -188,7 +188,7 @@ export default function Home() {
         initial={{ opacity: 0, scaleX: 0 }}
         whileInView={{ opacity: 1, scaleX: 1 }}
         viewport={{ once: true }}
-        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] }}
       />
 
       {/* Pipeline Timeline */}
