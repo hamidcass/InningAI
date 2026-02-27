@@ -29,8 +29,7 @@ def evaluate_model(model_pipeline, features_df, target_stat):
     target_stat: a string representation of stat: HR, AVG, OPS, WRC_PLUS
     """
 
-    #get x and y
-    x_cols = [c for c in features_df.columns if c.startswith("Current_")]
+    x_cols = list(model_pipeline.feature_names_in_)
     y = features_df[f"Target_{target_stat}"]
 
     X = features_df[x_cols]

@@ -15,7 +15,8 @@ import joblib #save models
 
 from storage.io import load_dataframe, save_dataframe
 from storage.model_io import upload_model
-from preprocessing.build_features import run_build_features
+from storage.db import write_df_to_db
+from preprocessing.build_features import run_build_features, get_input_metrics
 
 #our models we will train and their args
 MODELS = {
@@ -127,19 +128,20 @@ def train_all_models(input_uri, target_stat, model_uris, metrics_uris, importanc
     train_df = df[df["Next_Season"] != 2025].copy()
     test_df = df[df["Next_Season"] == 2025].copy()
 
-    feature_stats = [c for c in train_df.columns if c.startswith("Current_") and c not in ["Current_Team", "Next_Team"]]
+    all_metrics = get_input_metrics(target_stat)
+    input_metrics = [m for m in all_metrics if m != target_stat]
+    feature_cols = [f"Current_{m}" for m in input_metrics]
 
     results = {}
 
     for model_name, model in MODELS.items():
         print(f"Training model: {model_name}")
 
-        X_train, y_train = train_df[feature_stats], train_df[f"Target_{target_stat}"]
-        X_test, y_test = test_df[feature_stats], test_df[f"Target_{target_stat}"]
+        X_train, y_train = train_df[feature_cols], train_df[f"Target_{target_stat}"]
+        X_test, y_test = test_df[feature_cols], test_df[f"Target_{target_stat}"]
 
-        #preprocess (make all rows numerical)
         preprocessor = ColumnTransformer([
-            ('num', StandardScaler(), feature_stats)
+            ('num', StandardScaler(), feature_cols)
         ])
 
         pipeline = Pipeline([
@@ -155,13 +157,19 @@ def train_all_models(input_uri, target_stat, model_uris, metrics_uris, importanc
         mae = mean_absolute_error(y_test, predictions)
         r2 = r2_score(y_test, predictions)
 
-        #shap and importance analysis
-        feature_names = feature_stats
+        feature_names = feature_cols
         if model_name in ["RandomForest", "XGBoost"]:
             explainer = shap.Explainer(pipeline.named_steps["model"])
-            shap_values = explainer(pipeline.named_steps["preprocessor"].transform(X_train))
+            x_transformed = pipeline.named_steps["preprocessor"].transform(X_train)
+            shap_values = explainer(x_transformed)
             shap_importance = np.abs(shap_values.values).mean(axis=0)
-            shap_direction = np.sign(shap_values.values).mean(axis=0)
+
+            shap_direction = np.array([
+                np.corrcoef(X_train.iloc[:, i].values, shap_values.values[:, i])[0, 1]
+                if X_train.iloc[:, i].std() > 0 else 0.0
+                for i in range(len(feature_cols))
+            ])
+            shap_direction = np.nan_to_num(shap_direction, nan=0.0)
 
             importance_df = pd.DataFrame({
                 "Feature": feature_names,
@@ -172,7 +180,7 @@ def train_all_models(input_uri, target_stat, model_uris, metrics_uris, importanc
             importance_df["Effect"] = importance_df["Direction"].apply(
                 lambda x: "Increases prediction" if x > 0 else "Decreases prediction")
 
-        elif model_name in ["LinearRegression", "RidgeRegression"]:
+        elif model_name in ["LinearRegression", "Ridge"]:
             coefficients = pipeline.named_steps['model'].coef_
             importance_df = pd.DataFrame({
                 "Feature": feature_names,
@@ -200,8 +208,10 @@ def train_all_models(input_uri, target_stat, model_uris, metrics_uris, importanc
         )
     
 
-        # Save feature importance
+        # Save feature importance to S3 and database
         save_dataframe(importance_df, importance_uris[model_name])
+        importance_table = f"{target_stat.lower()}_{model_name.lower()}_importance"
+        write_df_to_db(importance_df, importance_table)
 
         results[model_name] = {
             "mae": mae,
